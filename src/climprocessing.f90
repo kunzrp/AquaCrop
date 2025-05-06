@@ -3,7 +3,9 @@ module ac_climprocessing
 use ac_global, only:    DaysInMonth, &
                         DetermineDate, &
                         DetermineDayNr, &
+                        FileExists, & ! RPK fix 20
                         GetEToFilefull, &
+                        EToFull, &                ! RPK fix 20   
                         GetEToRecord_FromD, &
                         GetEToRecord_FromM, &
                         GetEToRecord_FromY, &
@@ -12,6 +14,7 @@ use ac_global, only:    DaysInMonth, &
                         GetEToRecord_ToM, &
                         GetEToRecord_ToY, &
                         GetRainFilefull, &
+                        RainFull, &                ! RPK fix 20                        
                         GetRainRecord_FromD, &
                         GetRainRecord_FromM, &
                         GetRainRecord_FromY, &
@@ -19,11 +22,15 @@ use ac_global, only:    DaysInMonth, &
                         GetRainRecord_ToM, &
                         GetRainRecord_ToY, &
                         LeapYear, &
-                        rep_DayEventDbl
+                        rep_DayEventDbl, &
+                        GetTemperatureFilefull, &  ! RPK fix 20
+                        TminFull, &                ! RPK fix 20
+                        TmaxFull                   ! RPK fix 20
 use ac_kinds, only: dp, &
                     int8, &
                     int32, &
                     sp
+use iso_fortran_env, only: iostat_end ! RPK fix 20
 implicit none
 
 
@@ -68,7 +75,7 @@ subroutine GetParameters(C1, C2, C3, UL, LL, Mid)
 end subroutine GetParameters
 
 
-subroutine GetInterpolationParameters(C1, C2, C3, aOver3, bOver2, c)
+subroutine GetInterpolationParams(C1, C2, C3, aOver3, bOver2, c)
     real(dp), intent(in) :: C1
     real(dp), intent(in) :: C2
     real(dp), intent(in) :: C3
@@ -81,7 +88,7 @@ subroutine GetInterpolationParameters(C1, C2, C3, aOver3, bOver2, c)
     bOver2 = (-6*C1+9*C2-3*C3)/(6*30*30)
     c = (11*C1-7*C2+2*C3)/(6*30)
 
-end subroutine GetInterpolationParameters
+end subroutine GetInterpolationParams
 
 
 subroutine GetMonthlyEToDataSet(DayNri, EToDataSet)
@@ -104,7 +111,7 @@ subroutine GetMonthlyEToDataSet(DayNri, EToDataSet)
     if ((Monthi == 2) .and. LeapYear(Yeari)) then
         DayN = DayN + 1
     end if
-    call GetInterpolationParameters(C1, C2, C3, aOver3, bOver2, c)
+    call GetInterpolationParams(C1, C2, C3, aOver3, bOver2, c)
     do Dayi = 1, DayN
         t2 = t1 + 1
         EToDataSet(Dayi)%DayNr = DNR+Dayi-1
@@ -766,5 +773,6 @@ subroutine GetMonthlyRainDataSet(DayNri, RainDataSet)
         close(fRain)
     end subroutine GetSetofThreeMonths
 end subroutine GetMonthlyRainDataSet
+
 
 end module ac_climprocessing
