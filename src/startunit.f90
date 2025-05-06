@@ -921,23 +921,28 @@ end subroutine LoadProgramParametersProjectPlugIn
 
 
 subroutine FinalizeTheProgram()
-
     integer :: fend
 
-    call fProjects_close()
+    ! RPK fix 25 - "All done" written to fProjects file
+!   call fProjects_close()
 
     ! all done
-    open(newunit=fend, file=(GetPathNameOutp() // 'AllDone.OUT'), &
-         status='replace', action='write')
-    write(fend, '(a)') 'All done'
+ !  open(newunit=fend, file=(GetPathNameOutp() // 'AllDone.OUT'), &
+ !       status='replace', action='write')
+ !  write(fend, '(a)') 'All done'
+
+    call fProjects_write('')
+    call fProjects_write('All done')
+    call fProjects_close()
 end subroutine FinalizeTheProgram
 
 
-subroutine WriteProjectsInfo(line)
-    character(len=*), intent(in) :: line
-
-    call fProjects_write('')
-end subroutine WriteProjectsInfo
+! RPK fix 25 - this subroutine is no longer needed, replaced with call fProjects_write()
+!subroutine WriteProjectsInfo(line)
+!    character(len=*), intent(in) :: line
+!
+!    call fProjects_write('') ! RPK fix 25 - should be call fProjects_write(trim(line))
+!end subroutine WriteProjectsInfo
 
 
 subroutine StartTheProgram()
@@ -955,8 +960,12 @@ subroutine StartTheProgram()
     nprojects = GetNumberOfProjects()
 
     if (nprojects > 0) then
-        call WriteProjectsInfo('')
-        call WriteProjectsInfo('Projects handled:')
+        ! RPK fix 25 - Error in WriteProjectsInfo, prints only a blank line and not what is passed to the subroutine
+!       call WriteProjectsInfo('')
+!       call WriteProjectsInfo('Projects handled:')
+        ! RPK fix 25 - rather use call fProjects_write()
+        call fProjects_write('')
+        call fProjects_write('Projects handled:')
     end if
 
     do iproject = 1, nprojects
@@ -967,13 +976,25 @@ subroutine StartTheProgram()
     end do
 
     if (nprojects == 0) then
-        call WriteProjectsInfo('')
-        call WriteProjectsInfo('Projects loaded: None')
+        ! RPK fix 25 - Error in WriteProjectsInfo, prints only a blank line and not what is passed to the subroutine
+!       call WriteProjectsInfo('')
+!       call WriteProjectsInfo('Projects loaded: None')
+        ! RPK fix 25 - rather use call fProjects_write()
+        call fProjects_write('')
+        call fProjects_write('Projects loaded: None')
 
         if (ListProjectFileExist) then
-            call WriteProjectsInfo('File "ListProjects.txt" does not contain ANY project file')
+            ! RPK fix 25 - Error in WriteProjectsInfo, prints only a blank line and not what is passed to the subroutine
+!           call WriteProjectsInfo('File "ListProjects.txt" does not contain ANY project file')
+            ! RPK fix 25 - rather use call fProjects_write()
+            call fProjects_write('')
+            call fProjects_write('File "ListProjects.txt" does not contain ANY project file')
         else
-            call WriteProjectsInfo('Missing File "ListProjects.txt" in LIST directory')
+            ! RPK fix 25 - Error in WriteProjectsInfo, prints only a blank line and not what is passed to the subroutine
+!           call WriteProjectsInfo('Missing File "ListProjects.txt" in LIST directory')
+            ! RPK fix 25 - rather use call fProjects_write()
+            call fProjects_write('')
+            call fProjects_write('Missing File "ListProjects.txt" in LIST directory')
         end if
     end if
     call FinalizeTheProgram
