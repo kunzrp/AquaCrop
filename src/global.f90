@@ -669,7 +669,7 @@ type rep_sim
     integer(int32) :: YearStartCropCycle
         !! calendar year in which crop cycle starts
     integer(int32) :: CropDay1Previous
-        !! previous daynumber at the start of teh crop cycle
+        !! previous daynumber at the start of the crop cycle
 end type rep_sim
 
 type rep_DayEventDbl
@@ -930,15 +930,18 @@ end type rep_FileOK
     
 character(len=:), allocatable :: RainFile
 character(len=:), allocatable :: RainFileFull
+character(len=:), allocatable :: RainFileFullPrevious ! RPK fix 20
 character(len=:), allocatable :: RainDescription
 character(len=:), allocatable :: EToFile
 character(len=:), allocatable :: EToFileFull
+character(len=:), allocatable :: EToFileFullPrevious ! RPK fix 20
 character(len=:), allocatable :: EToDescription
 character(len=:), allocatable :: CalendarFile
 character(len=:), allocatable :: CalendarFileFull
 character(len=:), allocatable :: CalendarDescription
 character(len=:), allocatable :: CO2File
 character(len=:), allocatable :: CO2FileFull
+character(len=:), allocatable :: CO2FileFullPrevious ! RPK fix 23
 character(len=:), allocatable :: CO2Description
 character(len=:), allocatable :: IrriFile
 character(len=:), allocatable :: IrriFileFull
@@ -976,6 +979,7 @@ character(len=:), allocatable :: MultipleProjectDescription
 character(len=:), allocatable :: MultipleProjectFile
 character(len=:), allocatable :: TemperatureFile
 character(len=:), allocatable :: TemperatureFileFull
+character(len=:), allocatable :: TemperatureFileFullPrevious ! RPK fix 20
 character(len=:), allocatable :: TemperatureDescription
 character(len=:), allocatable :: MultipleProjectFileFull
 character(len=:), allocatable :: FullFileNameProgramParameters
@@ -1064,6 +1068,16 @@ real(sp), dimension(1:366) :: TmaxRun, TminRun
 real(sp), dimension(1:12) ::  TmaxTnxReference12MonthsRun, TminTnxReference12MonthsRun
 real(sp), dimension(1:365) :: TmaxCropReferenceRun, TminCropReferenceRun
 real(sp), dimension(1:365) :: TmaxTnxReference365DaysRun, TminTnxReference365DaysRun
+
+! RPK fix 20
+real(dp), dimension(:), allocatable :: EToFull     ! (daily)  ETo                 data global variable
+real(dp), dimension(:), allocatable :: RainFull    ! (daily)  rainfall            data global variable
+real(dp), dimension(:), allocatable :: TminFull    ! (daily)  minimum temperature data global variable (Tmin changed to TminFull)
+real(dp), dimension(:), allocatable :: TmaxFull    ! (daily)  maximum temperature data global variable (Tmax changed to TmaxFull)
+real(sp), dimension(0:365,2)        :: TCropdotSIM ! (,1) = Tmin & (,2) = Tmax & (0,) = number of values in array (i.e. file)
+
+! RPK fix 23
+real(dp), dimension(1902:2099)      :: CO2Full     ! (yearly) CO2                 data global variable
 
 logical :: EvapoEntireSoilSurface ! True of soil wetted by RAIN (false = IRRIGATION and fw < 1)
 logical :: PreDay, OutDaily, Out8Irri
@@ -1187,7 +1201,7 @@ subroutine DeclareInitialCondAtFCandNoSalt()
 
     integer(int32) :: layeri, compi, celli, ind
 
-    call SetSWCiniFile('(None)')
+    call SetSWCiniFile('(none)')
     call SetSWCiniFileFull(GetSWCiniFile()) ! no file
     call SetSWCiniDescription('Soil water profile at Field Capacity')
     call SetSimulation_IniSWC_AtDepths(.false.)
@@ -3131,10 +3145,11 @@ real(dp) function CO2ForSimulationPeriod(FromDayNr, ToDayNr)
     integer(int32), intent(in) :: FromDayNr
     integer(int32), intent(in) :: ToDayNr
 
-    integer(int32) :: i, Dayi, Monthi, FromYi, ToYi, rc
-    real(dp) :: CO2From, CO2To, CO2a, CO2b, YearA, YearB
-    integer :: fhandle
-    character(len=255) :: TempString
+    integer(int32) :: i, Dayi, Monthi, FromYi, ToYi
+!   integer(int32) :: rc                                 ! RPK fix 23 - variable  no longer needed
+!   real(dp) :: CO2From, CO2To, CO2a, CO2b, YearA, YearB ! RPK fix 23 - variables no longer needed
+!   integer :: fhandle                                   ! RPK fix 23 - variables no longer needed
+!   character(len=255) :: TempString                     ! RPK fix 23 - variables no longer needed
 
     call DetermineDate(FromDayNr, Dayi, Monthi, FromYi)
     call DetermineDate(ToDayNr, Dayi, Monthi, ToYi)
@@ -3142,64 +3157,67 @@ real(dp) function CO2ForSimulationPeriod(FromDayNr, ToDayNr)
     if ((FromYi == 1901) .or. (ToYi == 1901)) then
         CO2ForSimulationPeriod = CO2Ref
     else
-        open(newunit=fhandle, file=trim(GetCO2FileFull()), status='old', &
-                                                    action='read',iostat=rc)
-        do i= 1, 3
-            read(fhandle, *, iostat=rc) ! Description and Title
-        end do
-        ! from year
-        read(fhandle, '(a)', iostat=rc) TempString
-        call SplitStringInTwoParams(trim(TempString), YearB, CO2b)
-        if (roundc(YearB, mold=1) >= FromYi) then
-            CO2From = CO2b
-            YearA = YearB
-            CO2a = CO2b
-        else
-            loop: do
-                YearA = YearB
-                CO2a = Co2b
-                read(fhandle, '(a)', iostat=rc) TempString
-                call SplitStringInTwoParams(trim(TempString), YearB, CO2b)
-                if ((roundc(YearB, mold=1) >= FromYi) .or. (rc == iostat_end)) exit loop
-            end do loop
-            if (FromYi > roundc(YearB, mold=1)) then
-                CO2From = CO2b
-            else
-                CO2From = CO2a + (CO2b-CO2a)* (FromYi - &
-                roundc(YearA, mold=1))/real(roundc(YearB, mold=1)-roundc(YearA, mold=1),kind=dp)
-            end if
-        end if
-        ! to year
-        CO2To = CO2From
-        if ((ToYi > FromYi) .and. (ToYi > roundc(YearA, mold=1))) then
-            if (roundc(YearB, mold=1) >= ToYi) then
-                CO2To = CO2a + (CO2b-CO2a)* (ToYi - &
-                roundc(YearA, mold=1))/real(roundc(YearB, mold=1)-roundc(YearA, mold=1), kind=dp)
-            elseif (.not. (rc == iostat_end)) then
-                loop_2: do
-                    YearA = YearB
-                    CO2a = Co2b
-                    read(fhandle, '(a)', iostat=rc) TempString
-                    call SplitStringInTwoParams(trim(TempString), YearB, CO2b)
-                    if (((roundc(YearB, mold=1) >= ToYi) .or. (rc == iostat_end))) &
-                                                                    exit loop_2
-                end do loop_2
-                if (ToYi > roundc(YearB, mold=1)) then
-                    CO2To = CO2b
-                else
-                    CO2To = CO2a + (CO2b-CO2a)* (ToYi - &
-                    roundc(YearA, mold=1))/real(roundc(YearB, mold=1)-roundc(YearA, mold=1), kind=dp)
-                end if
-            end if
-        end if
-        Close(fhandle)
-        CO2ForSimulationPeriod = (CO2From+CO2To)/2._dp
+        ! RPK fix 23 - use CO2 values stored in global array CO2Full
+!       open(newunit=fhandle, file=trim(GetCO2FileFull()), status='old', &
+!                                                   action='read',iostat=rc)
+!       do i= 1, 3
+!           read(fhandle, *, iostat=rc) ! Description and Title
+!       end do
+!       ! from year
+!       read(fhandle, '(a)', iostat=rc) TempString
+!       call SplitStringInTwoParams(trim(TempString), YearB, CO2b)
+!       if (roundc(YearB, mold=1) >= FromYi) then
+!           CO2From = CO2b
+!           YearA = YearB
+!           CO2a = CO2b
+!       else
+!           loop: do
+!               YearA = YearB
+!               CO2a = Co2b
+!               read(fhandle, '(a)', iostat=rc) TempString
+!               call SplitStringInTwoParams(trim(TempString), YearB, CO2b)
+!               if ((roundc(YearB, mold=1) >= FromYi) .or. (rc == iostat_end)) exit loop
+!           end do loop
+!           if (FromYi > roundc(YearB, mold=1)) then
+!               CO2From = CO2b
+!           else
+!               CO2From = CO2a + (CO2b-CO2a)* (FromYi - &
+!               roundc(YearA, mold=1))/real(roundc(YearB, mold=1)-roundc(YearA, mold=1),kind=dp)
+!           end if
+!       end if
+!       ! to year
+!       CO2To = CO2From
+!       if ((ToYi > FromYi) .and. (ToYi > roundc(YearA, mold=1))) then
+!           if (roundc(YearB, mold=1) >= ToYi) then
+!               CO2To = CO2a + (CO2b-CO2a)* (ToYi - &
+!               roundc(YearA, mold=1))/real(roundc(YearB, mold=1)-roundc(YearA, mold=1), kind=dp)
+!           elseif (.not. (rc == iostat_end)) then
+!               loop_2: do
+!                   YearA = YearB
+!                   CO2a = Co2b
+!                   read(fhandle, '(a)', iostat=rc) TempString
+!                   call SplitStringInTwoParams(trim(TempString), YearB, CO2b)
+!                   if (((roundc(YearB, mold=1) >= ToYi) .or. (rc == iostat_end))) &
+!                                                                   exit loop_2
+!               end do loop_2
+!               if (ToYi > roundc(YearB, mold=1)) then
+!                   CO2To = CO2b
+!               else
+!                   CO2To = CO2a + (CO2b-CO2a)* (ToYi - &
+!                   roundc(YearA, mold=1))/real(roundc(YearB, mold=1)-roundc(YearA, mold=1), kind=dp)
+!               end if
+!           end if
+!       end if
+!       Close(fhandle)
+!       CO2ForSimulationPeriod = (CO2From+CO2To)/2._dp
+
+        ! RPK fix 23
+        CO2ForSimulationPeriod = (CO2Full(FromYi) + CO2Full(ToYi))/2._dp
     end if
 end function CO2ForSimulationPeriod
 
 
 subroutine ReadRainfallSettings()
-
     integer :: fhandle
     character :: fullname
     integer(int8) :: NrM, effrainperc,effrainshow,effrainrootE
@@ -3228,7 +3246,6 @@ end subroutine ReadRainfallSettings
 
 
 subroutine ReadSoilSettings()
-
     integer :: fhandle
     character(len=:), allocatable :: fullName
     integer(int8) :: i, simul_saltdiff, simul_saltsolub, simul_root, simul_iniab
@@ -4231,7 +4248,7 @@ subroutine AdjustOnsetSearchPeriod()
 
     integer(int32) :: temp_Integer
 
-    if (GetClimFile() == '(None)') then
+    if (GetClimFile() == '(none)') then
         call SetOnset_StartSearchDayNr(1)
         call SetOnset_StopSearchDayNr(GetOnset_StartSearchDayNr() &
                + GetOnset_LengthSearchPeriod() - 1)
@@ -4318,8 +4335,8 @@ subroutine SetClimData()
     call SetClimRecord_NrObs(999) ! (heeft geen belang)
 
     ! Part A - ETo and Rain files --> ClimFile
-    if ((GetEToFile() == '(None)') .and. (GetRainFile() == '(None)')) then
-        call SetClimFile('(None)')
+    if ((GetEToFile() == '(none)') .and. (GetRainFile() == '(none)')) then
+        call SetClimFile('(none)')
         call SetClimDescription('Specify Climatic data when Running AquaCrop')
         call SetClimRecord_DataType(datatype_daily)
         call SetClimRecord_FromString('any date')
@@ -4328,7 +4345,7 @@ subroutine SetClimData()
     else
         call SetClimFile('EToRainTempFile')
         call SetClimDescription('Read ETo/RAIN/TEMP data set')
-        if (GetEToFile() == '(None)') then
+        if (GetEToFile() == '(none)') then
             call SetClimRecord_FromY(GetRainRecord_FromY())
             call SetClimRecord_FromDayNr(GetRainRecord_FromDayNr())
             call SetClimRecord_ToDayNr(GetRainRecord_ToDayNr())
@@ -4340,7 +4357,7 @@ subroutine SetClimData()
                 call SetClimRecord_NrObs(365)
             end if
         end if
-        if (GetRainFile() == '(None)') then
+        if (GetRainFile() == '(none)') then
             call SetClimRecord_FromY(GetEToRecord_FromY())
             call SetClimRecord_FromDayNr(GetEToRecord_FromDayNr())
             call SetClimRecord_ToDayNr(GetEToRecord_ToDayNr())
@@ -4353,7 +4370,7 @@ subroutine SetClimData()
             end if
         end if
 
-        if ((GetEToFile() /= '(None)') .and. (GetRainFile() /= '(None)')) then
+        if ((GetEToFile() /= '(none)') .and. (GetRainFile() /= '(none)')) then
             SetARecord = GetEToRecord()
             SetBRecord = GetRainRecord()
             if (((GetEToRecord_FromY() == 1901) &
@@ -4445,7 +4462,7 @@ subroutine SetClimData()
                 call SetClimRecord_ToString(SetBRecord%ToString)
             end if
             if (GetClimRecord_ToDayNr() < GetClimRecord_FromDayNr()) then
-                call SetClimFile('(None)')
+                call SetClimFile('(none)')
                 call SetClimDescription(&
                        'ETo data set <--NO OVERLAP--> RAIN data set')
                 call SetClimRecord_NrObs(0)
@@ -4455,11 +4472,11 @@ subroutine SetClimData()
     end if
 
     ! Part B - ClimFile and Temperature files --> ClimFile
-    if ((GetTemperatureFile() == '(None)') .or.&
-        (GetTemperatureFile() == '(External)')) then
+    if ((GetTemperatureFile() == '(none)') .or.&
+        (GetTemperatureFile() == '(external)')) then
         ! no adjustments are required
     else
-        if (GetClimFile() == '(None)') then
+        if (GetClimFile() == '(none)') then
             call SetClimFile('EToRainTempFile')
             call SetClimDescription('Read ETo/RAIN/TEMP data set')
             call SetClimRecord_FromY(GetTemperatureRecord_FromY())
@@ -4583,7 +4600,7 @@ subroutine SetClimData()
                 call SetClimRecord_ToString(SetBRecord%ToString)
             end if
             if (GetClimRecord_ToDayNr() < GetClimRecord_FromDayNr()) then
-                call SetClimFile('(None)')
+                call SetClimFile('(none)')
                 call SetClimDescription(&
                         'Clim data <--NO OVERLAP--> TEMPERATURE data')
                 call SetClimRecord_NrObs(0)
@@ -4603,7 +4620,7 @@ character(len=17) function DayString(DNr)
     integer(int32) :: DNr_t
 
     DNr_t = DNr
-    if (GetClimFile() == '(None)') then
+    if (GetClimFile() == '(none)') then
         do while (DNr_t > 365)
             DNr_t = DNr_t - 365
         end do
@@ -4681,7 +4698,7 @@ end subroutine AdjustYearPerennials
 
 
 subroutine NoCropCalendar()
-    call SetCalendarFile('(None)')
+    call SetCalendarFile('(none)')
     call SetCalendarFileFull(GetCalendarFile())  ! no file
     call SetCalendarDescription('')
     call SetOnset_GenerateOn(.false.)
@@ -4696,7 +4713,7 @@ subroutine DetermineLinkedSimDay1(CropDay1, SimDay1)
     integer(int32), intent(inout) :: SimDay1
 
     SimDay1 = CropDay1
-    if (GetClimFile() /= '(None)') then
+    if (GetClimFile() /= '(none)') then
         if ((SimDay1 < GetClimRecord_FromDayNr()) .or. &
             (SimDay1 > GetClimRecord_ToDayNr())) then
             call SetSimulation_LinkCropToSimPeriod(.false.)
@@ -4726,7 +4743,7 @@ subroutine AdjustSimPeriod()
         else
             call SetSimulation_ToDayNr(GetSimulation_FromDayNr() + 30) ! 30 days
         end if
-        if (GetClimFile() /= '(None)') then
+        if (GetClimFile() /= '(none)') then
             if (GetSimulation_ToDayNr() > GetClimRecord_ToDayNr()) then
                 call SetSimulation_ToDayNr(GetClimRecord_ToDayNr())
             end if
@@ -4739,7 +4756,7 @@ subroutine AdjustSimPeriod()
             call SetSimulation_FromDayNr(GetCrop_Day1())
         end if
         call SetSimulation_ToDayNr(GetCrop_DayN())
-        if ((GetClimFile() /= '(None)') .and. &
+        if ((GetClimFile() /= '(none)') .and. &
             ((GetSimulation_FromDayNr() <= GetClimRecord_FromDayNr()) &
              .or. (GetSimulation_FromDayNr() >= GetClimRecord_ToDayNr()))) then
             call SetSimulation_FromDayNr(GetClimRecord_FromDayNr())
@@ -4750,7 +4767,7 @@ subroutine AdjustSimPeriod()
     ! adjust initial depth and quality of the groundwater when required
     if ((.not. GetSimulParam_ConstGwt()) .and. &
         (IniSimFromDayNr /= GetSimulation_FromDayNr())) then
-        if (GetGroundWaterFile() == '(None)') then
+        if (GetGroundWaterFile() == '(none)') then
             FullFileName = GetPathNameProg()// 'GroundWater.AqC'
         else
             FullFileName = GetGroundWaterFileFull()
@@ -4864,6 +4881,7 @@ subroutine LoadCrop(FullName)
             call SetCrop_Planting(plant_Seed)
     end select
 
+    ! RPK fix 04 crop%ModeCycle = ModeCycle = 1 (CalendarDays mode) if not zero
     ! mode
     read(fhandle, *) XX
     if (XX == 0) then
@@ -5370,20 +5388,22 @@ real(dp) function SeasonalSumOfKcPot(TheDaysToCCini, TheGDDaysToCCini, L0, L12, 
     integer(int32) :: DayCC, Tadj, GDDTadj
     integer :: fhandle
     integer(int32) :: Dayi
+    integer(int32) :: j ! RPK fix 22
     integer(int32) :: rc
     logical :: GrowthON
 
     ! 1. Open Temperature file
-    if ((GetTemperatureFile() /= '(None)') .and. &
-        (GetTemperatureFile() /= '(External)')) then
-        if (ReferenceClimate .eqv. .true.) then
-            open(newunit=fhandle, file=trim(GetPathNameSimul()//'TCropReference.SIM'), &
-                 status='old', action='read')
-        else
-            open(newunit=fhandle, file=trim(GetPathNameSimul()//'TCrop.SIM'), &
-                 status='old', action='read')
-        end if
-    end if
+    ! RPK Fix 22 - TCropReference.SIM no longer created/used
+!    if ((GetTemperatureFile() /= '(none)') .and. &
+!       (GetTemperatureFile() /= '(external)')) then
+!       if (ReferenceClimate .eqv. .true.) then
+!           open(newunit=fhandle, file=trim(GetPathNameSimul()//'TCropReference.SIM'), &
+!                status='old', action='read')
+!       else
+!           open(newunit=fhandle, file=trim(GetPathNameSimul()//'TCrop.SIM'), &
+!                status='old', action='read')
+!       end if
+!   end if
 
     ! 2. Initialise global settings
     call SetSimulation_DelayedDays(0) ! required for CalculateETpot
@@ -5437,25 +5457,55 @@ real(dp) function SeasonalSumOfKcPot(TheDaysToCCini, TheGDDaysToCCini, L0, L12, 
         CCinitial = CCo
     end if
 
+    ! RPK fix 22
+    j = 0
+
     ! 3. Calculate Sum
     do Dayi = 1, L1234
         ! 3.1 calculate growing degrees for the day
-        if (GetTemperatureFile() == '(None)') then
+        if (GetTemperatureFile() == '(none)') then
             GDDi = DegreesDay(Tbase, Tupper, TDayMin, TDayMax, &
                                     GetSimulParam_GDDMethod())
-        elseif (GetTemperatureFile() == '(External)') then
+        elseif (GetTemperatureFile() == '(external)') then
             Tndayi = real(GetTminRun_i(GetCrop_Day1()-GetSimulation_FromDayNr()+Dayi),kind=dp)
             Txdayi = real(GetTmaxRun_i(GetCrop_Day1()-GetSimulation_FromDayNr()+Dayi),kind=dp)
             GDDi = DegreesDay(Tbase, Tupper, Tndayi, Txdayi, &
                                     GetSimulParam_GDDMethod())
         else
-            read(fhandle, *, iostat=rc) Tndayi, Txdayi
-            if ((rc == iostat_end) .and. (ReferenceClimate .eqv. .true.)) then
-                close(fhandle)
-                open(newunit=fhandle, file=trim(GetPathNameSimul()//'TCropReference.SIM'), &
-                    status='old', action='read')
-                read(fhandle, *, iostat=rc) Tndayi, Txdayi
-            end if
+            ! RPK fix 22 - TCropReference.SIM no longer used
+            ! This code is not the same as that BNormalized() in tempprocessing.f90
+
+!           read(fhandle, *, iostat=rc) Tndayi, Txdayi
+!           if ((rc == iostat_end) .and. (ReferenceClimate .eqv. .true.)) then
+!               close(fhandle)
+!               open(newunit=fhandle, file=trim(GetPathNameSimul()//'TCropReference.SIM'), &
+!                   status='old', action='read')
+!               read(fhandle, *, iostat=rc) Tndayi, Txdayi
+!           end if
+
+            ! RPK Fix 22
+            j = j + 1
+            if (ReferenceClimate .eqv. .true.) then
+                ! RPK fix 24 - To prevent AquaCrop crashing in cold climates
+                if (j > 365) then
+                    write(*,*) 'ERROR: Array CropReferenceRun is too small',j
+                    j = 1
+                    ! stop 1
+                endif
+                
+                ! RPK Fix 22 - use temperature values from TCropReference.SIM file
+                Tndayi = GetTminCropReferenceRun_i(j)
+                Txdayi = GetTmaxCropReferenceRun_i(j)
+            else
+                ! RPK fix 24
+                if (j > TCropdotSIM(0,1)) j = 1
+                
+                ! RPK Fix 22 - use temperature values from TCrop.SIM file
+                ! this makes no sense since ReferenceClimate is always set to .true.
+                Tndayi = TCropdotSIM(j,1)
+                Txdayi = TCropdotSIM(j,2)
+            end if    
+
             GDDi = DegreesDay(Tbase, Tupper, Tndayi, Txdayi, &
                                     GetSimulParam_GDDMethod())
         end if
@@ -5554,10 +5604,11 @@ real(dp) function SeasonalSumOfKcPot(TheDaysToCCini, TheGDDaysToCCini, L0, L12, 
     end do
 
     ! 5. Close Temperature file
-    if ((GetTemperatureFile() /= '(None)') .and. &
-        (GetTemperatureFile() /= '(External)')) then
-        close(fhandle)
-    end if
+    ! RPK fix 22
+!   if ((GetTemperatureFile() /= '(none)') .and. &
+!       (GetTemperatureFile() /= '(external)')) then
+!       close(fhandle)
+!   end if
 
     ! 6. final sum
     SeasonalSumOfKcPot = SumKcPot
@@ -5970,15 +6021,50 @@ subroutine AdjustThetaInitial(PrevNrComp, PrevThickComp, PrevVolPrComp, PrevECdS
 end subroutine AdjustThetaInitial
 
 
-subroutine LoadClim(FullName, ClimateDescription, ClimateRecord)
+! RPK fix 20
+subroutine LoadClim(FullName, FileType, ClimateDescription, ClimateRecord)
     character(len=*), intent(in) :: FullName
+    integer, intent(in) :: FileType ! RPK fix 20
     character(len=*), intent(inout) :: ClimateDescription
     type(rep_clim), intent(inout) :: ClimateRecord
 
+    character(len=len(FullName)) :: FullNamePrevious ! RPK fix 20
+    character(len=255) :: StringREAD ! RPK fix 20
+
     integer :: fhandle
     integer(int32) :: Ni, rc
+    integer :: nlines, nrows, daynum, i ! RPK fix 20
+
+    real(dp) :: Tmin_temp, Tmax_temp ! RPK fix 20
 
     logical :: file_exists
+
+    ! RPK fix 20
+    if      (FileType == 1) then
+        FullNamePrevious = GetEToFileFullPrevious()
+    else if (FileType == 2) then
+        FullNamePrevious = GetRainFileFullPrevious()
+    else if (FileType == 3) then
+        FullNamePrevious = GetTemperatureFileFullPrevious()
+    else
+        write(*,*) 'ERROR: Variable FileType is not set'
+        stop 1
+    end if
+    if (FullName == FullNamePrevious) then
+        ! If the current file name is the same as the previous file name,
+        ! there is no need to read the climate file again, so exit the subroutine
+        return
+    else
+        ! Set the name of the previous file name (new global variable) including the path
+        ! if it is different to the current file name
+        if      (FileType == 1) then
+            call SetEToFileFullPrevious(FullName)
+        else if (FileType == 2) then
+            call SetRainFileFullPrevious(FullName)
+        else if (FileType == 3) then
+            call SetTemperatureFileFullPrevious(FullName)
+        end if
+    end if
 
     inquire(file=trim(FullName), exist=file_exists)
     if (file_exists) then
@@ -5987,6 +6073,36 @@ subroutine LoadClim(FullName, ClimateDescription, ClimateRecord)
     else
         write(*,*) 'Climate file not found: ' // trim(FullName)
         return
+    end if
+
+    ! RPK fix 20
+    ! Count the number of lines
+    ! Do this once (not for each season) and for the .TNX file only
+    nlines = 0
+    if (.not.allocated(TminFull) .AND. &
+        .not.allocated(TmaxFull)) then
+        do
+            read(fhandle, '(a)', iostat=rc)
+            if (rc == iostat_end) then
+                exit
+            else
+                nlines = nlines + 1
+            end if
+        end do
+        rewind(fhandle)
+    end if
+
+    nrows = 0
+    if (nlines /= 0) then
+        ! Now read in the actual content
+        nrows = nlines - 8
+
+        ! RPK fix 20
+        allocate(TminFull(0:nrows+1))
+        allocate(TmaxFull(0:nrows+1))
+
+        if (.not.allocated(EtoFull)) allocate(EToFull(0:nrows+1))
+        if (.not.allocated(RainFull)) allocate(RainFull(0:nrows+1))
     end if
 
     read(fhandle, '(a)', iostat=rc) ClimateDescription
@@ -6004,15 +6120,130 @@ subroutine LoadClim(FullName, ClimateDescription, ClimateRecord)
     read(fhandle, *, iostat=rc)
     read(fhandle, *, iostat=rc)
     read(fhandle, *, iostat=rc)
+
+    ! RPK fix 20
+    call DetermineDayNr(ClimateRecord%FromD, ClimateRecord%FromM, ClimateRecord%FromY, daynum)
+    daynum = daynum - 1
+
     ClimateRecord%NrObs = 0
-    read(fhandle, *, iostat=rc)
+
+    ! RPK fix 20
+    if      (FileType == 1) then
+        EToFull(ClimateRecord%NrObs) = daynum
+    else if (FileType == 2) then
+        RainFull(ClimateRecord%NrObs) = daynum
+    else if (FileType == 3) then
+        TminFull(ClimateRecord%NrObs) = daynum
+        TmaxFull(ClimateRecord%NrObs) = daynum
+    end if
+
+    ! RPK fix 20
+!   read(fhandle, *, iostat=rc)
     do while (rc /= iostat_end)
         ClimateRecord%NrObs = ClimateRecord%NrObs + 1
-        read(fhandle, *, iostat=rc)
+        ! RPK fix 20
+        if      (FileType == 1) then
+            read(fhandle, *, iostat=rc) EToFull(ClimateRecord%NrObs)
+        else if (FileType == 2) then
+            read(fhandle, *, iostat=rc) RainFull(ClimateRecord%NrObs)
+        else if (FileType == 3) then
+            ! RPK fix 20 ! This code is preferred for reading in the temperature data
+            ! Not sure why when it can be simplified as per next read statement
+            ! read(fhandle, *, iostat=rc) TminFull(ClimateRecord%NrObs), TmaxFull(ClimateRecord%NrObs)
+            read(fhandle, '(a)', iostat=rc) StringREAD
+            call SplitStringInTwoParams(StringREAD, Tmin_temp, Tmax_temp)
+            TminFull(ClimateRecord%NrObs) = Tmin_temp
+            TmaxFull(ClimateRecord%NrObs) = Tmax_temp
+        end if
     end do
+    
+    ! RPK fix 20
+    ClimateRecord%NrObs = ClimateRecord%NrObs - 1
+
+    if (nrows /= 0 .AND. &
+        nrows /= ClimateRecord%NrObs) then
+        write(*,*) 'ERROR: number of rows in climate file is incorrect'
+        stop 1
+    end if    
+
     close(fhandle)
     call CompleteClimateDescription(ClimateRecord)
 end subroutine LoadClim
+
+
+! RPK fix 23
+! New subroutine to read in the CO2 values once and store them in a global array
+subroutine LoadCO2(FullName)
+    character(len=*), intent(in)   :: FullName
+    character(len=len(FullName))   :: FullNamePrevious
+    character(len=1025)            :: TempString
+    integer(int32)                 :: fhandle, rc
+    integer(int32)                 :: i, YearI
+    real(dp)                       :: TheCO2, YearR
+    real(dp)                       :: CO2a, CO2b, YearA, YearB
+    real(dp), dimension(1902:2099) :: CO2Valu 
+    logical                        :: file_exists
+
+    FullNamePrevious = GetCO2FileFullPrevious()
+    if (FullName == FullNamePrevious) then
+        ! If the current file name is the same as the previous file name,
+        ! there is no need to read the CO2 file again, so exit the subroutine
+        return
+    else
+        call SetCO2FileFullPrevious(FullName)
+    end if
+
+    inquire(file=trim(FullName), exist=file_exists)
+    if (file_exists) then
+        open(newunit=fhandle, file=trim(FullName), status='old', action='read', &
+        iostat=rc)
+    else
+        write(*,*) 'CO2 file not found: ' // trim(FullName)
+        return
+    end if
+
+    do i= 1, 3
+        read(fhandle, *, iostat=rc) ! Skip description and title
+    end do
+
+    CO2Valu = 0._dp
+    do while (rc /= iostat_end)
+        read(fhandle, '(a)', iostat=rc) TempString
+        call SplitStringInTwoParams(trim(TempString), YearR, TheCO2)
+        YearI = roundc(YearR, mold=1)
+        CO2Valu(YearI) = TheCO2
+    end do
+    close(fhandle)
+
+    ! Interpoloate CO2 values for missing years
+    CO2Full = 0._dp
+    do YearI = 1902, 2099
+        if (CO2Valu(YearI) > 0._dp) then
+            CO2Full(YearI) = CO2Valu(YearI)
+        else
+            ! Find the previous actual CO2 value
+            loop_1: do i = YearI, 1902, -1
+                if (CO2Valu(i) /= 0._dp) then
+                    YearA = real(i, kind=dp)
+                    CO2a = CO2Valu(i)
+                    exit loop_1
+                end if
+            end do loop_1
+
+            ! Find the next actual CO2 value
+            loop_2: do i = YearI, 2099, +1
+                if (CO2Valu(i) /= 0._dp) then
+                    YearB = real(i, kind=dp)
+                    CO2b = CO2Valu(i)
+                    exit loop_2
+                end if
+            end do loop_2
+            YearR = real(YearI, kind=dp)
+            TheCO2 = CO2a + (CO2b - CO2a) * (YearR - YearA)/(YearB - YearA)
+            CO2Full(YearI) = TheCO2
+        end if
+     end do
+end subroutine LoadCO2
 
 
 subroutine LoadGroundWater(FullName, AtDayNr, Zcm, ECdSm)
@@ -6489,7 +6720,7 @@ subroutine AdjustCropYearToClimFile(CDay1, CDayN)
     character(len=:), allocatable :: temp_str
 
     call DetermineDate(CDay1, dayi, monthi, yeari)
-    if (GetClimFile() == '(None)') then
+    if (GetClimFile() == '(none)') then
         yeari = 1901  ! yeari = 1901 if undefined year
     else
         yeari = GetClimRecord_FromY() ! yeari = 1901 if undefined year
@@ -6704,13 +6935,13 @@ subroutine CheckForKeepSWC(RunWithKeepSWC, ConstZrxForRun)
                                              ! (to restore after check)
 
     Filename = ProjectInput(1)%Soil_Filename
-    has_external = Filename == '(External)'
+    has_external = Filename == '(external)'
 
     if (has_external) then
         ! Note: here we use the AquaCrop version number and assume that
         ! the same version can be used in finalizing the soil settings.
         call LoadProfileProcessing(ProjectInput(1)%VersionNr)
-    elseif (trim(FileName) == '(None)') then
+    elseif (trim(FileName) == '(none)') then
         FullFileName = GetPathNameSimul() // 'DEFAULT.SOL'
         call LoadProfile(FullFileName)
     else
@@ -6792,15 +7023,18 @@ subroutine InitializeGlobalStrings()
 
     call SetRainFile('')
     call SetRainFileFull('')
+    call SetRainFileFullPrevious('') ! RPK fix 23
     call SetRainDescription('')
     call SetEToFile('')
     call SetEToFileFull('')
+    call SetEToFileFullPrevious('') ! RPK fix 23
     call SetEToDescription('')
     call SetCalendarFile('')
     call SetCalendarFileFull('')
     call SetCalendarDescription('')
     call SetCO2File('')
     call SetCO2FileFull('')
+    call SetCO2FileFullPrevious('') ! RPK fix 23
     call SetCO2Description('')
     call SetIrriFile('')
     call SetIrriFileFull('')
@@ -6838,6 +7072,7 @@ subroutine InitializeGlobalStrings()
     call SetMultipleProjectFile('')
     call SetTemperatureFile('')
     call SetTemperatureFileFull('')
+    call SetTemperatureFileFullPrevious('') ! RPK fix 23
     call SetTemperatureDescription('')
     call SetMultipleProjectFileFull('')
     call SetFullFileNameProgramParameters('')
@@ -7284,7 +7519,7 @@ subroutine CheckFilesInProject(Runi, AllOK, FileOK)
         character(len=*), intent(in) :: directory
         character(len=*), intent(in) :: filename
 
-        if (filename /= '(None)') then
+        if (filename /= '(none)') then
             if (.not. FileExists(directory // filename)) then
                 AllOK = .false.
                 FileOK_tmp = .false.
@@ -7658,8 +7893,11 @@ subroutine LoadProfile(FullName)
     do i = 1, GetSoil_NrSoilLayers()
         ! Parameters for capillary rise missing in Versions 3.0 and 3.1
         if (roundc(VersionNr*10, mold=1) < 40) then
+! RPK fix 09 ! remove read of blank variable to avoid AquaCrop crashing on soils with one name, e.g. sand, silt, clay
+!            read(fhandle, *) thickness_temp, SAT_temp, FC_temp, &
+!                             WP_temp, infrate_temp, blank, description_temp
             read(fhandle, *) thickness_temp, SAT_temp, FC_temp, &
-                             WP_temp, infrate_temp, blank, description_temp
+                             WP_temp, infrate_temp, description_temp
             call SetSoilLayer_Thickness(i, thickness_temp)
             call SetSoilLayer_SAT(i, SAT_temp)
             call SetSoilLayer_FC(i, FC_temp)
@@ -8385,6 +8623,24 @@ subroutine SetCO2FileFull(str)
 end subroutine SetCO2FileFull
 
 
+! RPK fix 23
+function GetCO2FileFullPrevious() result(str)
+    !! Getter for the "CO2FileFullPrevious" global variable.
+    character(len=:), allocatable :: str
+
+    str = CO2FileFullPrevious
+end function GetCO2FilefullPrevious
+
+
+! RPK fix 23
+subroutine SetCO2FileFullPrevious(str)
+    !! Setter for the "CO2FileFullPrevious" global variable.
+    character(len=*), intent(in) :: str
+
+    CO2FileFullPrevious = str
+end subroutine SetCO2FileFullPrevious
+
+
 function GetCO2Description() result(str)
     !! Getter for the "CO2Description" global variable.
     character(len=:), allocatable :: str
@@ -8977,6 +9233,24 @@ subroutine SetEToFileFull(str)
 end subroutine SetEToFileFull
 
 
+! RPK fix 20
+function GetEToFileFullPrevious() result(str)
+    !! Getter for the "EToFileFullPrevious" global variable.
+    character(len=:), allocatable :: str
+
+    str = EToFileFullPrevious
+end function GetEToFilefullPrevious
+
+
+! RPK fix 20
+subroutine SetEToFileFullPrevious(str)
+    !! Setter for the "EToFileFullPrevious" global variable.
+    character(len=*), intent(in) :: str
+
+    EToFileFullPrevious = str
+end subroutine SetEToFileFullPrevious
+
+
 function GetEToDescription() result(str)
     !! Getter for the "EToDescription" global variable.
     character(len=:), allocatable :: str
@@ -9023,6 +9297,24 @@ subroutine SetRainFileFull(str)
 
     RainFileFull = str
 end subroutine SetRainFileFull
+
+
+! RPK fix 20
+function GetRainFileFullPrevious() result(str)
+    !! Getter for the "RainFileFullPrevious" global variable.
+    character(len=:), allocatable :: str
+
+    str = RainFileFullPrevious
+end function GetRainFilefullPrevious
+
+
+! RPK fix 20
+subroutine SetRainFileFullPrevious(str)
+    !! Setter for the "RainFileFullPrevious" global variable.
+    character(len=*), intent(in) :: str
+
+    RainFileFullPrevious = str
+end subroutine SetRainFileFullPrevious
 
 
 function GetRainDescription() result(str)
@@ -10881,6 +11173,11 @@ function GetCrop_PlantingDens() result(PlantingDens)
     integer(int32) :: PlantingDens
 
     PlantingDens = crop%PlantingDens
+    ! RPK fix 03
+    if (PlantingDens == 0) then
+        write(*,*) 'ERROR: planting density cannot be 0 plants/ha'
+        stop 1
+    endif
 end function GetCrop_PlantingDens
 
 
@@ -12953,6 +13250,24 @@ subroutine SetTemperatureFilefull(str)
 
     TemperatureFilefull = str
 end subroutine SetTemperatureFilefull
+
+
+! RPK fix 20
+function GetTemperatureFileFullPrevious() result(str)
+    !! Getter for the "TemperatureFileFullPrevious" global variable.
+    character(len=:), allocatable :: str
+
+    str = TemperatureFileFullPrevious
+end function GetTemperatureFilefullPrevious
+
+
+! RPK fix 20
+subroutine SetTemperatureFileFullPrevious(str)
+    !! Setter for the "TemperatureFileFullPrevious" global variable.
+    character(len=*), intent(in) :: str
+
+    TemperatureFileFullPrevious = str
+end subroutine SetTemperatureFileFullPrevious
 
 
 function GetTnxReferenceFile() result(str)
