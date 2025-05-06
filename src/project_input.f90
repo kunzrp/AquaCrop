@@ -231,6 +231,7 @@ subroutine read_project_file(self, filename, NrRun)
         !! Run index (should be 1 in the case of a PRO file)
 
     integer :: fhandle, i, rc, Runi
+    integer :: len ! RPK fix 02
     character(len=1024) :: buffer
 
     open(newunit=fhandle, file=trim(filename), status='old', action='read', &
@@ -259,112 +260,197 @@ subroutine read_project_file(self, filename, NrRun)
     read(fhandle, '(a)', iostat=rc) buffer
     self%Climate_Info = trim(buffer)
     read(fhandle, *, iostat=rc) buffer
+    if (trim(buffer) == '(None)') buffer = '(none)' ! RPK fix 05
+    if (trim(buffer) == '(External)') buffer = '(external)' ! RPK fix 05
     self%Climate_Filename = trim(buffer)
     read(fhandle, *, iostat=rc) buffer
+    if (trim(buffer) == '(None)') buffer = '(none)' ! RPK fix 05
+    if (trim(buffer) == '(External)') buffer = '(external)' ! RPK fix 05
+    len=len_trim(buffer) ! RPK fix 02
+    ! adding a forward slash works in Linux and Windows (for the Intel Fortran compiler)
+    if (buffer(len:len) /= ')' .and. (buffer(len:len) /= '\' .or. buffer(len:len) /= '/')) buffer(len+1:len+1) = '/'
     self%Climate_Directory = trim(buffer)
 
     ! 1.1 Temperature
     read(fhandle, '(a)', iostat=rc) buffer
     self%Temperature_Info = trim(buffer)
     read(fhandle, *, iostat=rc) buffer
+    if (trim(buffer) == '(None)') buffer = '(none)' ! RPK fix 05
+    if (trim(buffer) == '(External)') buffer = '(external)' ! RPK fix 05
     self%Temperature_Filename = trim(buffer)
     read(fhandle, *, iostat=rc) buffer
+    if (trim(buffer) == '(None)') buffer = '(none)' ! RPK fix 05
+    if (trim(buffer) == '(External)') buffer = '(external)' ! RPK fix 05
+    len=len_trim(buffer) ! RPK fix 02
+    if (buffer(len:len) /= ')' .and. (buffer(len:len) /= '\' .or. buffer(len:len) /= '/')) buffer(len+1:len+1) = '/'
     self%Temperature_Directory = trim(buffer)
 
     ! 1.2 ETo
     read(fhandle, '(a)', iostat=rc) buffer
     self%ETo_Info = trim(buffer)
     read(fhandle, *, iostat=rc) buffer
+    if (trim(buffer) == '(None)') buffer = '(none)' ! RPK fix 05
+    if (trim(buffer) == '(External)') buffer = '(external)' ! RPK fix 05
     self%ETo_Filename = trim(buffer)
     read(fhandle, *, iostat=rc) buffer
+    if (trim(buffer) == '(None)') buffer = '(none)' ! RPK fix 05
+    if (trim(buffer) == '(External)') buffer = '(external)' ! RPK fix 05
+    len=len_trim(buffer) ! RPK fix 02
+    if (buffer(len:len) /= ')' .and. (buffer(len:len) /= '\' .or. buffer(len:len) /= '/')) buffer(len+1:len+1) = '/'
     self%ETo_Directory = trim(buffer)
 
     ! 1.3 Rain
     read(fhandle, '(a)', iostat=rc) buffer
     self%Rain_Info = trim(buffer)
     read(fhandle, *, iostat=rc) buffer
+    if (trim(buffer) == '(None)') buffer = '(none)' ! RPK fix 05
+    if (trim(buffer) == '(External)') buffer = '(external)' ! RPK fix 05
     self%Rain_Filename = trim(buffer)
     read(fhandle, *, iostat=rc) buffer
+    if (trim(buffer) == '(None)') buffer = '(none)' ! RPK fix 05
+    if (trim(buffer) == '(External)') buffer = '(external)' ! RPK fix 05
+    len=len_trim(buffer) ! RPK fix 02
+    if (buffer(len:len) /= ')' .and. (buffer(len:len) /= '\' .or. buffer(len:len) /= '/')) buffer(len+1:len+1) = '/'
     self%Rain_Directory = trim(buffer)
 
     ! 1.4 CO2
     read(fhandle, '(a)', iostat=rc) buffer
     self%CO2_Info = trim(buffer)
     read(fhandle, *, iostat=rc) buffer
+    if (trim(buffer) == '(None)') buffer = '(none)' ! RPK fix 05
+    if (trim(buffer) == '(External)') buffer = '(external)' ! RPK fix 05
     self%CO2_Filename = trim(buffer)
     read(fhandle, *, iostat=rc) buffer
+    if (trim(buffer) == '(None)') buffer = '(none)' ! RPK fix 05
+    if (trim(buffer) == '(External)') buffer = '(external)' ! RPK fix 05
+    len=len_trim(buffer) ! RPK fix 02
+    if (buffer(len:len) /= ')' .and. (buffer(len:len) /= '\' .or. buffer(len:len) /= '/')) buffer(len+1:len+1) = '/'
     self%CO2_Directory = trim(buffer)
 
     ! 2. Calendar
     read(fhandle, '(a)', iostat=rc) buffer
     self%Calendar_Info = trim(buffer)
     read(fhandle, *, iostat=rc) buffer
+    if (trim(buffer) == '(None)') buffer = '(none)' ! RPK fix 05
+    if (trim(buffer) == '(External)') buffer = '(external)' ! RPK fix 05
     self%Calendar_Filename = trim(buffer)
     read(fhandle, *, iostat=rc) buffer
+    if (trim(buffer) == '(None)') buffer = '(none)' ! RPK fix 05
+    if (trim(buffer) == '(External)') buffer = '(external)' ! RPK fix 05
+    len=len_trim(buffer) ! RPK fix 02
+    if (buffer(len:len) /= ')' .and. (buffer(len:len) /= '\' .or. buffer(len:len) /= '/')) buffer(len+1:len+1) = '/'
     self%Calendar_Directory = trim(buffer)
 
     ! 3. Crop
     read(fhandle, '(a)', iostat=rc) buffer
     self%Crop_Info = trim(buffer)
     read(fhandle, *, iostat=rc) buffer
+    if (trim(buffer) == '(None)') buffer = '(none)' ! RPK fix 05
+    if (trim(buffer) == '(External)') buffer = '(external)' ! RPK fix 05
     self%Crop_Filename = trim(buffer)
     read(fhandle, *, iostat=rc) buffer
+    if (trim(buffer) == '(None)') buffer = '(none)' ! RPK fix 05
+    if (trim(buffer) == '(External)') buffer = '(external)' ! RPK fix 05
+    len=len_trim(buffer) ! RPK fix 02
+    if (buffer(len:len) /= ')' .and. (buffer(len:len) /= '\' .or. buffer(len:len) /= '/')) buffer(len+1:len+1) = '/'
     self%Crop_Directory = trim(buffer)
 
     ! 4. Irrigation
     read(fhandle, '(a)', iostat=rc) buffer
     self%Irrigation_Info = trim(buffer)
     read(fhandle, *, iostat=rc) buffer
+    if (trim(buffer) == '(None)') buffer = '(none)' ! RPK fix 05
+    if (trim(buffer) == '(External)') buffer = '(external)' ! RPK fix 05
     self%Irrigation_Filename = trim(buffer)
     read(fhandle, *, iostat=rc) buffer
+    if (trim(buffer) == '(None)') buffer = '(none)' ! RPK fix 05
+    if (trim(buffer) == '(External)') buffer = '(external)' ! RPK fix 05
+    len=len_trim(buffer) ! RPK fix 02
+    if (buffer(len:len) /= ')' .and. (buffer(len:len) /= '\' .or. buffer(len:len) /= '/')) buffer(len+1:len+1) = '/'
     self%Irrigation_Directory = trim(buffer)
 
     ! 5. Field Management
     read(fhandle, '(a)', iostat=rc) buffer
     self%Management_Info = trim(buffer)
     read(fhandle, *, iostat=rc) buffer
+    if (trim(buffer) == '(None)') buffer = '(none)' ! RPK fix 05
+    if (trim(buffer) == '(External)') buffer = '(external)' ! RPK fix 05
     self%Management_Filename = trim(buffer)
     read(fhandle, *, iostat=rc) buffer
+    if (trim(buffer) == '(None)') buffer = '(none)' ! RPK fix 05
+    if (trim(buffer) == '(External)') buffer = '(external)' ! RPK fix 05
+    len=len_trim(buffer) ! RPK fix 02
+    if (buffer(len:len) /= ')' .and. (buffer(len:len) /= '\' .or. buffer(len:len) /= '/')) buffer(len+1:len+1) = '/'
     self%Management_Directory = trim(buffer)
 
     ! 6. Soil Profile
     read(fhandle, '(a)', iostat=rc) buffer
     self%Soil_Info = trim(buffer)
     read(fhandle, *, iostat=rc) buffer
+    if (trim(buffer) == '(None)') buffer = '(none)' ! RPK fix 05
+    if (trim(buffer) == '(External)') buffer = '(external)' ! RPK fix 05
     self%Soil_Filename = trim(buffer)
     read(fhandle, *, iostat=rc) buffer
+    if (trim(buffer) == '(None)') buffer = '(none)' ! RPK fix 05
+    if (trim(buffer) == '(External)') buffer = '(external)' ! RPK fix 05
+    len=len_trim(buffer) ! RPK fix 02
+    if (buffer(len:len) /= ')' .and. (buffer(len:len) /= '\' .or. buffer(len:len) /= '/')) buffer(len+1:len+1) = '/'
     self%Soil_Directory = trim(buffer)
 
     ! 7. GroundWater
     read(fhandle, '(a)', iostat=rc) buffer
     self%GroundWater_Info = trim(buffer)
     read(fhandle, *, iostat=rc) buffer
+    if (trim(buffer) == '(None)') buffer = '(none)' ! RPK fix 05
+    if (trim(buffer) == '(External)') buffer = '(external)' ! RPK fix 05
     self%GroundWater_Filename = trim(buffer)
     read(fhandle, *, iostat=rc) buffer
+    if (trim(buffer) == '(None)') buffer = '(none)' ! RPK fix 05
+    if (trim(buffer) == '(External)') buffer = '(external)' ! RPK fix 05
+    len=len_trim(buffer) ! RPK fix 02
+    if (buffer(len:len) /= ')' .and. (buffer(len:len) /= '\' .or. buffer(len:len) /= '/')) buffer(len+1:len+1) = '/'
     self%GroundWater_Directory = trim(buffer)
 
     ! 8. Initial conditions
     read(fhandle, '(a)', iostat=rc) buffer
     self%SWCIni_Info = trim(buffer)
     read(fhandle, *, iostat=rc) buffer
+    if (trim(buffer) == '(None)') buffer = '(none)' ! RPK fix 05
+    if (trim(buffer) == '(External)') buffer = '(external)' ! RPK fix 05
     self%SWCIni_Filename = trim(buffer)
     read(fhandle, *, iostat=rc) buffer
+    if (trim(buffer) == '(None)') buffer = '(none)' ! RPK fix 05
+    if (trim(buffer) == '(External)') buffer = '(external)' ! RPK fix 05
+    len=len_trim(buffer) ! RPK fix 02
+    if (buffer(len:len) /= ')' .and. (buffer(len:len) /= '\' .or. buffer(len:len) /= '/')) buffer(len+1:len+1) = '/'
     self%SWCIni_Directory = trim(buffer)
 
     ! 9. Off-season conditions
     read(fhandle, '(a)', iostat=rc) buffer
     self%OffSeason_Info = trim(buffer)
     read(fhandle, *, iostat=rc) buffer
+    if (trim(buffer) == '(None)') buffer = '(none)' ! RPK fix 05
+    if (trim(buffer) == '(External)') buffer = '(external)' ! RPK fix 05
     self%OffSeason_Filename = trim(buffer)
     read(fhandle, *, iostat=rc) buffer
+    if (trim(buffer) == '(None)') buffer = '(none)' ! RPK fix 05
+    if (trim(buffer) == '(External)') buffer = '(external)' ! RPK fix 05
+    len=len_trim(buffer) ! RPK fix 02
+    if (buffer(len:len) /= ')' .and. (buffer(len:len) /= '\' .or. buffer(len:len) /= '/')) buffer(len+1:len+1) = '/'
     self%OffSeason_Directory = trim(buffer)
 
     ! 10. Field data
     read(fhandle, '(a)', iostat=rc) buffer
     self%Observations_Info = trim(buffer)
     read(fhandle, *, iostat=rc) buffer
+    if (trim(buffer) == '(None)') buffer = '(none)' ! RPK fix 05
+    if (trim(buffer) == '(External)') buffer = '(external)' ! RPK fix 05
     self%Observations_Filename = trim(buffer)
     read(fhandle, *, iostat=rc) buffer
+    if (trim(buffer) == '(None)') buffer = '(none)' ! RPK fix 05
+    if (trim(buffer) == '(External)') buffer = '(external)' ! RPK fix 05
+    len=len_trim(buffer) ! RPK fix 02
+    if (buffer(len:len) /= ')' .and. (buffer(len:len) /= '\' .or. buffer(len:len) /= '/')) buffer(len+1:len+1) = '/'
     self%Observations_Directory = trim(buffer)
 
     close(fhandle)
