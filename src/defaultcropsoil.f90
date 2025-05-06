@@ -126,7 +126,8 @@ use ac_global , only:   DetermineParametersCR, &
                         SetSoilLayer_WP, &
                         subkind_Grain, &
                         undef_double, &
-                        undef_int
+                        undef_int, & ! RPK Fix 23
+                        FileExists   ! RPK Fix 23
 use ac_kinds, only: int8, &
                     int16, &
                     int32, &
@@ -281,7 +282,11 @@ subroutine ResetDefaultCrop(use_default_crop_file)
                                     ! transferred to above ground parts in next season
     if (use_default_crop_file) then
         call SetCropFilefull(GetPathNameSimul() // 'DEFAULT.CRO')
-        call SaveCrop(GetCropFilefull())
+        ! RPK fix 22 - Don't create DEFAULT.CRO if the file already exists
+        ! The user can delete the file to re-create it if necessary
+        if (.not.FileExists(GetCropFilefull())) then
+            call SaveCrop(GetCropFilefull())
+        end if    
     end if
 end subroutine ResetDefaultCrop
 
@@ -319,7 +324,11 @@ subroutine ResetDefaultSoil(use_default_soil_file)
 
     if (use_default_soil_file) then
         call SetProfFilefull(GetPathNameSimul() // 'DEFAULT.SOL')
-        call SaveProfile(GetProfFilefull())
+        ! RPK fix 22 - Don't create DEFAULT.SOL if the file already exists
+        ! The user can delete the file to re-create it if necessary
+        if (.not.FileExists(GetProfFilefull())) then
+            call SaveProfile(GetProfFilefull())
+        end if
     end if
 end subroutine ResetDefaultSoil
 
