@@ -84,6 +84,7 @@ use ac_global, only:    SetSimulParam_PercRAW, &
                         NoManagement, &
                         SetTemperatureFile, &
                         SetTemperatureFilefull, &
+                        SetTemperatureFileFullPrevious, & ! RPK fix 20
                         GetTemperatureFile, &
                         GetSimulParam_Tmin, &
                         GetSimulParam_Tmax, &
@@ -96,6 +97,7 @@ use ac_global, only:    SetSimulParam_PercRAW, &
                         SetTemperatureRecord_FromY, &
                         SetEToFile, &
                         SetEToFilefull, &
+                        SetEToFileFullPrevious, & ! RPK fix 20
                         GetEToFile, &
                         SetEToDescription, &
                         SetEToRecord_DataType, &
@@ -105,6 +107,7 @@ use ac_global, only:    SetSimulParam_PercRAW, &
                         SetEToRecord_FromY, &
                         SetRainFile, &
                         SetRainFilefull, &
+                        SetRainFileFullPrevious, & ! RPK fix 20
                         GetRainFile, &
                         SetRainDescription, &
                         SetRainRecord_DataType, &
@@ -114,6 +117,7 @@ use ac_global, only:    SetSimulParam_PercRAW, &
                         SetRainRecord_FromY, &
                         SetCO2File, &
                         SetCO2Filefull, &
+                        SetCO2FileFullPrevious, & ! RPK fix 23
                         GetCO2File, &
                         GetCO2Description, &
                         GetCO2Filefull, &
@@ -192,6 +196,7 @@ use ac_global, only:    SetSimulParam_PercRAW, &
                         SetSimulParam_EffectiveRain_RootNrEvap, &
                         SetSimulParam_EffectiveRain_ShowersInDecade, &
                         SetSimulParam_EffectiveRain_PercentEffRain
+
 use ac_kinds, only: dp, &
                     int8, &
                     int32
@@ -312,7 +317,7 @@ subroutine InitializeSettings(use_default_soil_file,use_default_crop_file)
     end if
 
     ! 2a. Ground water table
-    call SetGroundWaterFile('(None)')
+    call SetGroundWaterFile('(none)')
     call SetGroundWaterFilefull(GetGroundWaterFile())  ! no file
     call SetGroundWaterDescription('no shallow groundwater table')
     call SetZiAqua(undef_int)
@@ -328,17 +333,17 @@ subroutine InitializeSettings(use_default_soil_file,use_default_crop_file)
     call SetCrop_RootMax(1.00_dp) ! Maximum rooting depth (m)
 
     if (use_default_soil_file) then
-        call SetProfFile('DEFAULT.SOL')
+       call SetProfFile('DEFAULT.SOL')
         call SetProfFilefull(GetPathNameSimul() // GetProfFile())
         ! Crop.RootMin, RootMax, and Soil.RootMax are
         ! correctly calculated in LoadCrop
-        call LoadProfile(GetProfFilefull())
+       call LoadProfile(GetProfFilefull())
     end if
 
     call CompleteProfileDescription ! Simulation.ResetIniSWC AND
                         ! specify_soil_layer whcih contains
                         ! PROCEDURE DeclareInitialCondAtFCandNoSalt,
-                        ! in which SWCiniFile := '(None)', and settings
+                        ! in which SWCiniFile := '(none)', and settings
                         ! for Soil water and Salinity content
 
     ! 2c. Complete initial conditions (crop development)
@@ -367,16 +372,17 @@ subroutine InitializeSettings(use_default_soil_file,use_default_crop_file)
     call NoCropCalendar()
 
     ! 4. Field Management
-    call SetManFile('(None)')
+    call SetManFile('(none)')
     call SetManFilefull(GetManFile())  ! no file
     call NoManagement()
 
     ! 5. Climate
     ! 5.1 Temperature
-    call SetTemperatureFile('(None)')
+    call SetTemperatureFile('(none)')
     call SetTemperatureFilefull(GetTemperatureFile())  ! no file
+    call SetTemperatureFileFullPrevious(GetTemperatureFile()) ! RPK fix 20
     call SetTnxReferenceFile(GetTemperatureFile()) ! no file
-    call SetTnxReferenceYear(2000) ! for refernce CO2 concentration
+    call SetTnxReferenceYear(2000) ! for reference CO2 concentration
     write(TempString1, '(f8.1)') GetSimulParam_Tmin()
     write(TempString2, '(f8.1)') GetSimulParam_Tmax()
     call SetTemperatureDescription('')
@@ -387,8 +393,9 @@ subroutine InitializeSettings(use_default_soil_file,use_default_crop_file)
     call SetTemperatureRecord_FromY(1901)
 
     ! 5.2 ETo
-    call SetEToFile('(None)')
+    call SetEToFile('(none)')
     call SetEToFilefull(GetEToFile())  ! no file
+    call SetEToFileFullPrevious(GetEToFile()) ! RPK fix 20
     call SetEToDescription('')
     call SetEToRecord_DataType(datatype_Daily)
     call SetEToRecord_NrObs(0)
@@ -397,8 +404,9 @@ subroutine InitializeSettings(use_default_soil_file,use_default_crop_file)
     call SetEToRecord_FromY(1901)
 
     ! 5.3 Rain
-    call SetRainFile('(None)')
+    call SetRainFile('(none)')
     call SetRainFilefull(GetRainFile())  ! no file
+    call SetRainFileFullPrevious(GetRainFile()) ! RPK fix 20
     call SetRainDescription('')
     call SetRainRecord_DataType(datatype_Daily)
     call SetRainRecord_NrObs(0)
@@ -409,12 +417,13 @@ subroutine InitializeSettings(use_default_soil_file,use_default_crop_file)
     ! 5.4 CO2
     call SetCO2File('MaunaLoa.CO2')
     call SetCO2FileFull(GetPathNameSimul() // GetCO2File())
+    call SetCO2FileFullPrevious(GetCO2File()) ! RPK fix 23 - Don't use GetCO2FileFull
     CO2descr = GetCO2Description()
     call GenerateCO2Description(GetCO2FileFull(), CO2descr)
     call SetCO2Description(CO2descr)
 
     ! 5.5 Climate file
-    call SetClimateFile('(None)')
+    call SetClimateFile('(none)')
     call SetClimateFileFull(GetClimateFile())
     call SetClimateDescription('')
 
@@ -428,7 +437,7 @@ subroutine InitializeSettings(use_default_soil_file,use_default_crop_file)
     call SetCrop_Day1(Crop_Day1_temp)
     call SetCrop_DayN(Crop_DayN_temp)
     ! adjusting ClimRecord.'TO' for undefined year with 365 days
-    if ((GetClimFile() /= '(None)') .and. (GetClimRecord_FromY() == 1901) &
+    if ((GetClimFile() /= '(none)') .and. (GetClimRecord_FromY() == 1901) &
         .and. (GetClimRecord_NrObs() == 365)) then
         call AdjustClimRecordTo(GetCrop_DayN())
     end if
@@ -436,17 +445,17 @@ subroutine InitializeSettings(use_default_soil_file,use_default_crop_file)
     call AdjustSimPeriod()
 
     ! 6. irrigation
-    call SetIrriFile('(None)')
+    call SetIrriFile('(none)')
     call SetIrriFilefull(GetIrriFile())  ! no file
     call NoIrrigation()
 
     ! 7. Off-season
-    call SetOffSeasonFile('(None)')
+    call SetOffSeasonFile('(none)')
     call SetOffSeasonFileFull(GetOffSeasonFile())
     call NoManagementOffSeason()
 
     ! 8. Project and Multiple Project file
-    call SetProjectFile('(None)')
+    call SetProjectFile('(none)')
     call SetProjectFileFull(GetProjectFile())
     call SetProjectDescription('No specific project')
     call SetSimulation_MultipleRun(.false.) ! No sequence of simulation
@@ -459,7 +468,7 @@ subroutine InitializeSettings(use_default_soil_file,use_default_crop_file)
     call SetMultipleProjectDescription(GetProjectDescription())
 
     ! 9. Observations file
-    call SetObservationsFile('(None)')
+    call SetObservationsFile('(none)')
     call SetObservationsFileFull(GetObservationsFile())
     call SetObservationsDescription('No field observations')
 
