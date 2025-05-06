@@ -1,6 +1,6 @@
 module ac_tempprocessing
 
-use ac_global , only: undef_int, &
+use ac_global, only: undef_int, &
                       GetTmaxTnxReference12MonthsRun_i,&
                       GetTminTnxReference12MonthsRun_i,&
                       GetTmaxTnxReference12MonthsRun,&
@@ -309,7 +309,12 @@ use ac_global , only: undef_int, &
                       TminTnxReference365DaysRun, &
                       TmaxTnxReference365DaysRun, &
                       TminCropReferenceRun, &
-                      TmaxCropReferenceRun
+                      TmaxCropReferenceRun, &    ! RPK fix 20
+                      TminFull, &                ! RPK fix 20
+                      TmaxFull, &                ! RPK fix 20
+                      TCropdotSIM, &             ! RPK fix 22
+                      LoadCO2                    ! RPK fix 23
+
 use ac_kinds,  only: sp,&
                      dp, &
                      int8, &
@@ -325,7 +330,8 @@ implicit none
 
 
 logical :: TemperatureFilefull_exists
-real(dp), dimension(:), allocatable :: Tmin, Tmax  !! (daily) temperature data
+! RPK fix 20 
+! real(dp), dimension(:), allocatable :: Tmin, Tmax  !! (daily) temperature data
 type(rep_DayEventDbl), dimension(31) :: TminDataSet, TmaxDataSet
 
 
@@ -354,50 +360,7 @@ subroutine AdjustDecadeMONTHandYEAR(DecFile, Mfile, Yfile)
     end if
 end subroutine AdjustDecadeMONTHandYEAR
 
-
-subroutine ReadTemperatureFilefull()
-    !! Reads the contents of the TemperatureFilefull file,
-    !! storing the temperatures in the Tmin and Tmax arrays.
-
-    character(len=:), allocatable :: filename
-    integer :: fhandle, i, nlines, nrows, rc
-
-    filename = GetTemperatureFilefull()
-    open(newunit=fhandle, file=trim(filename), status='old', action='read')
-
-    ! Count the number of lines
-    nlines = 0
-    do
-        read(fhandle, '(a)', iostat=rc)
-        if (rc == iostat_end) then
-            exit
-        else
-            nlines = nlines + 1
-        end if
-    end do
-
-    ! Now read in the actual content
-    nrows = nlines - 8
-    if (allocated(Tmin)) deallocate(Tmin)
-    if (allocated(Tmax)) deallocate(Tmax)
-    allocate(Tmin(nrows), Tmax(nrows))
-
-    rewind(fhandle)
-    read(fhandle, *) ! description
-    read(fhandle, *) ! time step
-    read(fhandle, *) ! day
-    read(fhandle, *) ! month
-    read(fhandle, *) ! year
-    read(fhandle, *)
-    read(fhandle, *)
-    read(fhandle, *)
-    do i = 1, nrows
-        read(fhandle, *) Tmin(i), Tmax(i)
-    end do
-
-    close(fhandle)
-end subroutine ReadTemperatureFilefull
-
+! RPK fix 20 ! Delete ReadTemperatureFilefull() and repalced with LoadClim()
 
 subroutine SetDayNrToYundef(DayNri)
     integer(int32), intent(inout) :: DayNri
@@ -668,9 +631,9 @@ subroutine GetMonthlyTemperatureDataSet(DayNri, TminDataSet, TmaxDataSet)
         DayN = DayN + 1
     end if
 
-    call GetInterpolationParameters(C1Min, C2Min, C3Min, &
+    call GetInterpolationParams(C1Min, C2Min, C3Min, &
                    aOver3Min, bOver2Min, cMin)
-    call GetInterpolationParameters(C1Max, C2Max, C3Max, &
+    call GetInterpolationParams(C1Max, C2Max, C3Max, &
                    aOver3Max, bOver2Max, cMax)
     do Dayi = 1, DayN
         t2 = t1 + 1
@@ -902,7 +865,7 @@ subroutine GetMonthlyTemperatureDataSet(DayNri, TminDataSet, TmaxDataSet)
     end subroutine ReadMonth
 
 
-    subroutine GetInterpolationParameters(C1, C2, C3, &
+    subroutine GetInterpolationParams(C1, C2, C3, &
                           aOver3, bOver2, c)
         real(dp), intent(in) :: C1
         real(dp), intent(in) :: C2
@@ -915,7 +878,7 @@ subroutine GetMonthlyTemperatureDataSet(DayNri, TminDataSet, TmaxDataSet)
         aOver3 = (C1-2._dp*C2+C3)/(6._dp*30._dp*30._dp*30._dp)
         bOver2 = (-6._dp*C1+9._dp*C2-3._dp*C3)/(6._dp*30._dp*30._dp)
         c = (11._dp*C1-7._dp*C2+2._dp*C3)/(6._dp*30._dp)
-    end subroutine GetInterpolationParameters
+    end subroutine GetInterpolationParams
 end subroutine GetMonthlyTemperatureDataSet
 
 
@@ -940,12 +903,12 @@ integer(int32) function GrowingDegreeDays(ValPeriod, FirstDayPeriod, Tbase, &
     GDDays = 0._dp
 
     if (ValPeriod > 0) then
-        if (GetTemperatureFile() == '(None)') then
+        if (GetTemperatureFile() == '(none)') then
             ! given average Tmin and Tmax
             DayGDD = DegreesDay(Tbase, Tupper, &
                      TDayMin_local, TDayMax_local, GetSimulParam_GDDMethod())
             GDDays = roundc(ValPeriod * DayGDD, mold=1_int32)
-        else if (GetTemperatureFile() == '(External)') then
+        else if (GetTemperatureFile() == '(external)') then
             DayNri = FirstDayPeriod
             RemainingDays = ValPeriod
             i = DayNri - GetSimulation_FromDayNr() + 1
@@ -993,8 +956,8 @@ integer(int32) function GrowingDegreeDays(ValPeriod, FirstDayPeriod, Tbase, &
                 case (datatype_daily)
                     ! Tmin and Tmax arrays contain the TemperatureFilefull data
                     i = DayNri - GetTemperatureRecord_FromDayNr() + 1
-                    TDayMin_local = Tmin(i)
-                    TDayMax_local = Tmax(i)
+                    TDayMin_local = TminFull(i)
+                    TDayMax_local = TmaxFull(i)
 
                     DayGDD = DegreesDay(Tbase, Tupper, TDayMin_local, &
                                         TDayMax_local, &
@@ -1008,11 +971,11 @@ integer(int32) function GrowingDegreeDays(ValPeriod, FirstDayPeriod, Tbase, &
                         .or. AdjustDayNri))
 
                         i = i + 1
-                        if (i == size(Tmin)) then
+                        if (i == size(TminFull)) then
                             i = 1
                         end if
-                        TDayMin_local = Tmin(i)
-                        TDayMax_local = Tmax(i)
+                        TDayMin_local = TminFull(i)
+                        TDayMax_local = TmaxFull(i)
 
                         DayGDD = DegreesDay(Tbase, Tupper, TDayMin_local, &
                                             TDayMax_local, &
@@ -1133,7 +1096,7 @@ integer(int32) function SumCalendarDays(ValGDDays, FirstDayCrop, Tbase, Tupper,&
 
     NrCdays = 0
     if (ValGDDays > 0) then
-        if (GetTemperatureFile() == '(None)') then
+        if (GetTemperatureFile() == '(none)') then
             ! given average Tmin and Tmax
             DayGDD = DegreesDay(Tbase, Tupper, &
                        TDayMin_loc, TDayMax_loc, GetSimulParam_GDDMethod())
@@ -1142,7 +1105,7 @@ integer(int32) function SumCalendarDays(ValGDDays, FirstDayCrop, Tbase, Tupper,&
             else
                 NrCDays = roundc(ValGDDays/DayGDD, mold=1_int32)
             end if
-        else if (GetTemperatureFile() == '(External)') then
+        else if (GetTemperatureFile() == '(external)') then
             DayNri = FirstDayCrop
             RemainingGDDays = ValGDDays
             i = DayNri-GetSimulation_FromDayNr()+1
@@ -1190,8 +1153,8 @@ integer(int32) function SumCalendarDays(ValGDDays, FirstDayCrop, Tbase, Tupper,&
                 case (datatype_daily)
                     ! Tmin and Tmax arrays contain the TemperatureFilefull data
                     i = DayNri - GetTemperatureRecord_FromDayNr() + 1
-                    TDayMin_loc = Tmin(i)
-                    TDayMax_loc = Tmax(i)
+                    TDayMin_loc = TminFull(i)
+                    TDayMax_loc = TmaxFull(i)
 
                     DayGDD = DegreesDay(Tbase, Tupper, TDayMin_loc, &
                                         TDayMax_loc, &
@@ -1205,11 +1168,11 @@ integer(int32) function SumCalendarDays(ValGDDays, FirstDayCrop, Tbase, Tupper,&
                         .or. AdjustDayNri))
 
                         i = i + 1
-                        if (i == size(Tmin)) then
+                        if (i == size(TminFull)) then
                             i = 1
                         end if
-                        TDayMin_loc = Tmin(i)
-                        TDayMax_loc = Tmax(i)
+                        TDayMin_loc = TminFull(i)
+                        TDayMax_loc = TmaxFull(i)
 
                         DayGDD = DegreesDay(Tbase, Tupper, TDayMin_loc, &
                                             TDayMax_loc, &
@@ -1319,13 +1282,13 @@ real(dp) function MaxAvailableGDD(FromDayNr, Tbase, Tupper, TDayMin, TDayMax)
     type(rep_DayEventDbl), dimension(31) :: TminDataSet, TmaxDataSet
 
     MaxGDDays = 100000._dp
-    if (GetTemperatureFile() == '(None)') then
+    if (GetTemperatureFile() == '(none)') then
         DayGDD = DegreesDay(Tbase, Tupper, TDayMin, TDayMax, &
                        GetSimulParam_GDDMethod())
         if (DayGDD <= epsilon(1._dp)) then
             MaxGDDays = 0._dp
         end if
-    else if (GetTemperatureFile() == '(External)') then
+    else if (GetTemperatureFile() == '(external)') then
         DayNri = FromDayNr
         MaxGDDays = 0._dp
         i = DayNri - GetSimulation_FromDayNr() + 1
@@ -1359,8 +1322,8 @@ real(dp) function MaxAvailableGDD(FromDayNr, Tbase, Tupper, TDayMin, TDayMax)
             case (datatype_daily)
                 ! Tmin and Tmax arrays contain the TemperatureFilefull data
                 i = DayNri - GetTemperatureRecord_FromDayNr() + 1
-                TDayMin = Tmin(i)
-                TDayMax = Tmax(i)
+                TDayMin = TminFull(i)
+                TDayMax = TmaxFull(i)
 
                 DayNri = DayNri + 1
                 DayGDD = DegreesDay(Tbase, Tupper, TDayMin, TDayMax, &
@@ -1369,11 +1332,11 @@ real(dp) function MaxAvailableGDD(FromDayNr, Tbase, Tupper, TDayMin, TDayMax)
 
                 do while (DayNri < GetTemperatureRecord_ToDayNr())
                     i = i + 1
-                    if (i == size(Tmin)) then
+                    if (i == size(TminFull)) then
                         i = 1
                     end if
-                    TDayMin = Tmin(i)
-                    TDayMax = Tmax(i)
+                    TDayMin = TminFull(i)
+                    TDayMax = TmaxFull(i)
 
                     DayGDD = DegreesDay(Tbase, Tupper, TDayMin, TDayMax, &
                                         GetSimulParam_GDDMethod())
@@ -1916,6 +1879,7 @@ subroutine TemperatureFileCoveringCropPeriod(CropFirstDay, CropLastDay)
     character(len=:), allocatable :: totalnameOUT
     integer(int32) :: fhandle
     integer(int32) :: i, RunningDay
+    integer(int32) :: j ! RPK fix 24
     type(rep_DayEventDbl), dimension(31) :: TminDataSet, TmaxDataSet
     real(dp) :: Tlow, Thigh
 
@@ -1925,8 +1889,8 @@ subroutine TemperatureFileCoveringCropPeriod(CropFirstDay, CropLastDay)
         case (datatype_daily)
             ! Tmin and Tmax arrays contain the TemperatureFilefull data
             i = CropFirstDay - GetTemperatureRecord_FromDayNr() + 1
-            Tlow = Tmin(i)
-            Thigh = Tmax(i)
+            Tlow = TminFull(i)
+            Thigh = TmaxFull(i)
 
         case (datatype_decadely)
             call GetDecadeTemperatureDataSet(CropFirstDay, TminDataSet, &
@@ -1949,21 +1913,28 @@ subroutine TemperatureFileCoveringCropPeriod(CropFirstDay, CropLastDay)
         end select
 
         ! create SIM file and record first day
-        totalnameOUT = trim(GetPathNameSimul()) // 'TCrop.SIM'
-        open(newunit=fhandle, file=trim(totalnameOUT), &
-             action='write')
-        write(fhandle, '(2f10.4)') Tlow, Thigh
+        ! RPK fix 22 - This file is no longer created because data can be obtained from global arrays TminFull and TmaxFull
+!       totalnameOUT = trim(GetPathNameSimul()) // 'TCrop.SIM'
+!       open(newunit=fhandle, file=trim(totalnameOUT), &
+!            action='write')
+!       write(fhandle, '(2f10.4)') Tlow, Thigh
+        
+        ! RPK fix 22 - write TCrop.SIM data to a 2-dimenional array
+        TCropdotSIM = 0._dp        
+        j = 1
+        TCropdotSIM(j,1) = Tlow
+        TCropdotSIM(j,2) = Thigh
 
         ! next days of simulation period
         do RunningDay = (CropFirstDay + 1), CropLastDay
             select case (GetTemperatureRecord_DataType())
             case (datatype_daily)
                 i = i + 1
-                if (i == size(Tmin)) then
+                if (i == size(TminFull)) then
                     i = 1
                 end if
-                Tlow = Tmin(i)
-                Thigh = Tmax(i)
+                Tlow = TminFull(i)
+                Thigh = TmaxFull(i)
 
             case (datatype_decadely)
                 if (RunningDay > TminDataSet(31)%DayNr) then
@@ -1984,23 +1955,40 @@ subroutine TemperatureFileCoveringCropPeriod(CropFirstDay, CropLastDay)
                end if
                i = 1
                do while (TminDataSet(i)%DayNr /= RunningDay)
-                   i = i+1
+                   i = i + 1
                end do
                Tlow = TminDataSet(i)%Param
                Thigh = TmaxDataSet(i)%Param
             end select
+            ! RPK fix 22
+!           write(fhandle, '(2f10.4)') Tlow, Thigh
 
-            write(fhandle, '(2f10.4)') Tlow, Thigh
+            ! RPK fix 22
+            j = j + 1
+
+            ! RPK fix 24 - To prevent AquaCrop crashing in cold climates
+            if (j > 365) then
+                write(*,*)'ERROR: Array TCropdotSIM is too small',j,i
+!               stop 1
+            else
+                ! RPK fix 22
+                TCropdotSIM(j,1) = Tlow
+                TCropdotSIM(j,2) = Thigh
+            end if
         end do
 
-        close(fhandle)
+        ! RPK fix 22
+!       close(fhandle)
+        ! store no. of values in the array in position 0
+        TCropdotSIM(0,1) = j
+        TCropdotSIM(0,2) = j
     else
-        if (GetTemperatureFile() /= '(External)') then
+        if (GetTemperatureFile() /= '(external)') then
            write(*,*) 'ERROR: no valid air temperature file'
            return
            ! fatal error if no air temperature file
         end if
-    endif
+    end if
 end subroutine TemperatureFileCoveringCropPeriod
 
 
@@ -2091,14 +2079,14 @@ subroutine LoadSimulationRunProject(NrRun)
 
     ! 1. Climate
     call SetClimateFile(ProjectInput(NrRun)%Climate_Filename)
-    if ((GetClimateFile() == '(None)') .or. (GetClimateFile() == '(External)')) then
+    if ((GetClimateFile() == '(none)') .or. (GetClimateFile() == '(external)')) then
         call SetClimateFileFull(GetClimateFile())
     else
         call SetClimateFileFull(ProjectInput(NrRun)%Climate_Directory &
                                 // GetClimateFile())
         open(newunit=fClim, file=trim(GetClimateFileFull()), &
              status='old', action='read', iostat=rc)
-        ! 1.0 Description
+             ! 1.0 Description
         read(fClim, '(a)', iostat=rc) TempString
         call SetClimateDescription(trim(TempString))
         close(fClim)
@@ -2107,8 +2095,8 @@ subroutine LoadSimulationRunProject(NrRun)
     ! 1.1 Temperature
     call SetTemperatureFile(ProjectInput(NrRun)%Temperature_Filename)
 
-    if ((GetTemperatureFile() == '(None)') .or. &
-        (GetTemperatureFile() == '(External)')) then
+    if ((GetTemperatureFile() == '(none)') .or. &
+        (GetTemperatureFile() == '(external)')) then
         call SetTemperatureFilefull(GetTemperatureFile())  ! no file
         write(TempString1,'(f8.1)') GetSimulParam_Tmin()
         write(TempString2,'(f8.1)') GetSimulParam_Tmax()
@@ -2118,34 +2106,37 @@ subroutine LoadSimulationRunProject(NrRun)
         call SetTemperatureFilefull(ProjectInput(NrRun)%Temperature_Directory &
                                     // GetTemperatureFile())
         TemperatureFilefull_exists = FileExists(GetTemperatureFilefull())
-        if (TemperatureFilefull_exists) call ReadTemperatureFilefull()
+! RPK fix 20 ! Subroutine ReadTemperatureFilefull() replaced with LoadClim()
+!       if (TemperatureFileFull_exists) call ReadTemperatureFilefull()
 
         temperature_record = GetTemperatureRecord()
         TemperatureDescriptionLocal = GetTemperatureDescription()
-        call LoadClim(GetTemperatureFileFull(), TemperatureDescriptionLocal,&
+! RPK fix 20
+        call LoadClim(GetTemperatureFileFull(), 3, TemperatureDescriptionLocal,&
                        temperature_record)
+
         call SetTemperatureDescription(TemperatureDescriptionLocal)
         call CompleteClimateDescription(temperature_record)
         call SetTemperatureRecord(temperature_record)
     end if
 
     ! Create Temperature Reference file 
-    if (GetTemperatureFile() /= '(External)') then
+    if (GetTemperatureFile() /= '(external)') then
         call CreateTnxReferenceFile(GetTemperatureFile(),GetTnxReferenceFile(),GetTnxReferenceYear());
     end if
     call CreateTnxReference365Days();
 
     ! 1.2 ETo
     call SetEToFile(ProjectInput(NrRun)%ETo_Filename)
-    if ((GetEToFile() == '(None)') .or. &
-        (GetEToFile() == '(External)')) then
+    if ((GetEToFile() == '(none)') .or. &
+        (GetEToFile() == '(external)')) then
         call SetEToFilefull(GetEToFile())  ! no file
         call SetEToDescription('Specify ETo data when Running AquaCrop')
     else
         call SetEToFilefull(ProjectInput(NrRun)%ETo_Directory // GetEToFile())
         eto_descr = GetEToDescription()
         etorecord_tmp = GetEToRecord()
-        call LoadClim(GetEToFilefull(), eto_descr, etorecord_tmp)
+        call LoadClim(GetEToFilefull(), 1, eto_descr, etorecord_tmp)
         call SetEToDescription(eto_descr)
         call CompleteClimateDescription(etorecord_tmp)
         call SetEToRecord(etorecord_tmp)
@@ -2153,8 +2144,8 @@ subroutine LoadSimulationRunProject(NrRun)
 
     ! 1.3 Rain
     call SetRainFile(ProjectInput(NrRun)%Rain_Filename)
-    if ((GetRainFile() == '(None)') .or. &
-        (GetRainFile() == '(External)')) then
+    if ((GetRainFile() == '(none)') .or. &
+        (GetRainFile() == '(external)')) then
         call SetRainFilefull(GetRainFile())  ! no file
         call SetRainDescription('Specify Rain data when Running AquaCrop')
     else
@@ -2162,7 +2153,7 @@ subroutine LoadSimulationRunProject(NrRun)
                              // GetRainFile())
         rain_descr = Getraindescription()
         rainrecord_tmp = GetRainRecord()
-        call LoadClim(GetRainFilefull(), rain_descr, rainrecord_tmp)
+        call LoadClim(GetRainFilefull(), 2, rain_descr, rainrecord_tmp)
         call SetRainDescription(rain_descr)
         call CompleteClimateDescription(rainrecord_tmp)
         call SetRainRecord(rainrecord_tmp)
@@ -2170,21 +2161,24 @@ subroutine LoadSimulationRunProject(NrRun)
 
     ! 1.4 CO2
     call SetCO2File(ProjectInput(NrRun)%CO2_Filename)
-    if (GetCO2File() /= '(None)') then
+    if (GetCO2File() /= '(none)') then
         call SetCO2FileFull(ProjectInput(NrRun)%CO2_Directory &
                             // GetCO2File())
+        ! RPK fix 23 - Read the CO2 file
+        call LoadCO2(GetCO2FileFull())
+
         CO2descr =  GetCO2Description()
         call GenerateCO2Description(GetCO2FileFull(), CO2descr)
         call SetCO2Description(CO2descr)
     end if
-    if (GetClimateFile() /= '(External)') then
+    if (GetClimateFile() /= '(external)') then
         call SetClimData()
     end if
     call AdjustOnsetSearchPeriod() ! Set initial StartSearch and StopSearchDayNr
 
     ! 2. Calendar
     call SetCalendarFile(trim(ProjectInput(NrRun)%Calendar_Filename))
-    if (GetCalendarFile() == '(None)') then
+    if (GetCalendarFile() == '(none)') then
         call SetCalendarDescription('No calendar for the Seeding/Planting year')
     else
         call SetCalendarFileFull(ProjectInput(NrRun)%Calendar_Directory &
@@ -2243,7 +2237,7 @@ subroutine LoadSimulationRunProject(NrRun)
     call AdjustCalendarCrop(GetCrop_Day1())
     call CompleteCropDescription
     ! Onset.Off := true;
-    if (GetClimFile() == '(None)') then
+    if (GetClimFile() == '(none)') then
         Crop_Day1_temp = GetCrop_Day1()
         Crop_DayN_temp = GetCrop_DayN()
         call AdjustCropYearToClimFile(Crop_Day1_temp, Crop_DayN_temp)
@@ -2255,7 +2249,7 @@ subroutine LoadSimulationRunProject(NrRun)
     end if
 
     ! adjusting ClimRecord.'TO' for undefined year with 365 days
-    if ((GetClimFile() /= '(None)') .and. (GetClimRecord_FromY() == 1901) &
+    if ((GetClimFile() /= '(none)') .and. (GetClimRecord_FromY() == 1901) &
         .and. (GetClimRecord_NrObs() == 365)) then
         call AdjustClimRecordTo(GetCrop_DayN())
     end if
@@ -2264,7 +2258,7 @@ subroutine LoadSimulationRunProject(NrRun)
 
     ! 4. Irrigation
     call SetIrriFile(ProjectInput(NrRun)%Irrigation_Filename)
-    if (GetIrriFile() == '(None)') then
+    if (GetIrriFile() == '(none)') then
         call SetIrriFileFull(GetIrriFile())
         call NoIrrigation
         ! IrriDescription := 'Rainfed cropping';
@@ -2276,7 +2270,7 @@ subroutine LoadSimulationRunProject(NrRun)
 
     ! 5. Field Management
     call SetManFile(ProjectInput(NrRun)%Management_Filename)
-    if (GetManFile() == '(None)') then
+    if (GetManFile() == '(none)') then
         call SetManFileFull(GetManFile())
         call SetManDescription('No specific field management')
     else
@@ -2301,14 +2295,17 @@ subroutine LoadSimulationRunProject(NrRun)
     end if
 
     ! 6. Soil Profile
-    call SetProfFile(ProjectInput(NrRun)%Soil_Filename)
-    if (GetProfFile() == '(External)') then
-        call SetProfFilefull(GetProfFile())
-    elseif (GetProfFile() == '(None)') then
-        call SetProfFilefull(GetPathNameSimul() // 'DEFAULT.SOL')
-    else
-        call SetProfFilefull(ProjectInput(NrRun)%Soil_Directory &
-                             // GetProfFile())
+    ! RPK fix 10 ! only read the soil file once
+    if (NrRun == 1) then
+        call SetProfFile(ProjectInput(NrRun)%Soil_Filename)
+        if (GetProfFile() == '(external)') then
+            call SetProfFilefull(GetProfFile())
+        elseif (GetProfFile() == '(none)') then
+            call SetProfFilefull(GetPathNameSimul() // 'DEFAULT.SOL')
+        else
+            call SetProfFilefull(ProjectInput(NrRun)%Soil_Directory &
+                                 // GetProfFile())
+        end if
     end if
 
     ! The load of profile is delayed to check if soil water profile need to be
@@ -2316,7 +2313,7 @@ subroutine LoadSimulationRunProject(NrRun)
 
     ! 7. Groundwater
     call SetGroundWaterFile(ProjectInput(NrRun)%GroundWater_Filename)
-    if (GetGroundWaterFile() == '(None)') then
+    if (GetGroundWaterFile() == '(none)') then
         call SetGroundWaterFilefull(GetGroundWaterFile())
         call SetGroundWaterDescription('no shallow groundwater table')
     else
@@ -2343,12 +2340,15 @@ subroutine LoadSimulationRunProject(NrRun)
     else
         ! start with load and complete profile description (see 5.) which reset
         ! SWC to FC by default
-        if (GetProfFile() == '(External)') then
-            call LoadProfileProcessing(ProjectInput(NrRun)%VersionNr)
-        else
-            call LoadProfile(GetProfFilefull())
+        ! RPK fix 10 ! only read the file once
+        if (NrRun == 1) then    
+            if (GetProfFile() == '(external)') then
+                call LoadProfileProcessing(ProjectInput(NrRun)%VersionNr)
+            else
+                call LoadProfile(GetProfFilefull())
+            end if
+            call CompleteProfileDescription
         end if
-        call CompleteProfileDescription
 
         ! Adjust size of compartments if required
         TotDepth = 0._dp
@@ -2381,7 +2381,7 @@ subroutine LoadSimulationRunProject(NrRun)
         end if
 
         call SetSWCIniFile(ProjectInput(NrRun)%SWCIni_Filename)
-        if (GetSWCIniFile() == '(None)') then
+        if (GetSWCIniFile() == '(none)') then
             call SetSWCiniFileFull(GetSWCiniFile()) ! no file
             call SetSWCiniDescription(&
                      'Soil water profile at Field Capacity')
@@ -2431,7 +2431,7 @@ subroutine LoadSimulationRunProject(NrRun)
     ! 10. load the groundwater file if it exists (only possible for Version 4.0
     ! and higher)
     if ((roundc(10*ProjectInput(NrRun)%VersionNr, mold=1) >= 40) .and. &
-        (GetGroundWaterFile() /= '(None)')) then
+        (GetGroundWaterFile() /= '(none)')) then
           ! the groundwater file is only available in Version 4.0 or higher
         ZiAqua_temp = GetZiAqua()
         ECiAqua_temp = GetECiAqua()
@@ -2453,7 +2453,7 @@ subroutine LoadSimulationRunProject(NrRun)
 
     ! 11. Off-season conditions
     call SetOffSeasonFile(ProjectInput(NrRun)%OffSeason_Filename)
-    if (GetOffSeasonFile() == '(None)') then
+    if (GetOffSeasonFile() == '(none)') then
         call SetOffSeasonFileFull(GetOffSeasonFile())
         call SetOffSeasonDescription('No specific off-season conditions')
     else
@@ -2464,7 +2464,7 @@ subroutine LoadSimulationRunProject(NrRun)
 
     ! 12. Field data
     call SetObservationsFile(ProjectInput(NrRun)%Observations_Filename)
-    if (GetObservationsFile() == '(None)') then
+    if (GetObservationsFile() == '(none)') then
         call SetObservationsFileFull(GetObservationsFile())
         call SetObservationsDescription('No field observations')
     else
@@ -2543,11 +2543,12 @@ subroutine BTransferPeriod(TheDaysToCCini, TheGDDaysToCCini,&
     integer(int32) :: GDDTadj, Tadj, DayCC, Dayi, StartStorage
 
     ! 1. Open Temperature file
-    if ((GetTemperatureFile() /= '(None)') .and. &
-        (GetTemperatureFile() /= '(External)')) then
-        open(newunit=fTemp, file=trim(GetPathNameSimul()//'TCrop.SIM'), &
-             status='old', action='read', iostat=rc)
-    end if
+    ! RPK fix 22 - File no longer created
+!   if ((GetTemperatureFile() /= '(none)') .and. &
+!       (GetTemperatureFile() /= '(external)')) then
+!       open(newunit=fTemp, file=trim(GetPathNameSimul()//'TCrop.SIM'), &
+!            status='old', action='read', iostat=rc)
+!   end if
      ! 2. initialize
     call SetSimulation_DelayedDays(0) ! required for CalculateETpot
     SumBtot = 0._dp
@@ -2607,16 +2608,20 @@ subroutine BTransferPeriod(TheDaysToCCini, TheGDDaysToCCini,&
     ! 4. Calculate Biomass
     do Dayi = 1, L1234
         ! 4.1 growing degrees for dayi
-        if (GetTemperatureFile() == '(None)') then
+        if (GetTemperatureFile() == '(none)') then
             GDDi = DegreesDay(Tbase, Tupper, TDayMin, TDayMax, &
                               GetSimulParam_GDDMethod())
-        elseif (GetTemperatureFile() == '(External)') then 
+        elseif (GetTemperatureFile() == '(external)') then 
             Tndayi = real(GetTminRun_i(GetCrop_Day1()-GetSimulation_FromDayNr()+Dayi),kind=dp)
             Txdayi = real(GetTmaxRun_i(GetCrop_Day1()-GetSimulation_FromDayNr()+Dayi),kind=dp)
             GDDi = DegreesDay(Tbase, Tupper, Tndayi, Txdayi, &
                                     GetSimulParam_GDDMethod())
         else
-            read(fTemp, *, iostat=rc) Tndayi, Txdayi
+            ! RPK fix 22
+!           read(fTemp, *, iostat=rc) Tndayi, Txdayi
+            Tndayi = TCropdotSIM(Dayi,1)
+            Txdayi = TCropdotSIM(Dayi,2)
+
             GDDi = DegreesDay(Tbase, Tupper, Tndayi, Txdayi, &
                               GetSimulParam_GDDMethod())
         end if
@@ -2714,10 +2719,11 @@ subroutine BTransferPeriod(TheDaysToCCini, TheGDDaysToCCini,&
            end if
 
            ! 5. Close Temperature file
-           if ((GetTemperatureFile() /= '(None)') .and. &
-               (GetTemperatureFile() /= '(External)')) then
-               close(fTemp)
-           end if
+           ! RPK fix 22
+!          if ((GetTemperatureFile() /= '(none)') .and. &
+!              (GetTemperatureFile() /= '(external)')) then
+!              close(fTemp)
+!          end if
        end if
     end do
 end subroutine BTransferPeriod
@@ -2784,6 +2790,7 @@ real(dp) function Bnormalized(TheDaysToCCini, TheGDDaysToCCini,&
      integer(int32), parameter :: k = 2
 
      integer(int32) ::  fTemp, rc
+     integer(int32) ::  j ! RPK Fix 22
      real(dp) :: SumGDD, Tndayi, Txdayi, GDDi, CCi,&
                  CCxWitheredForB, TpotForB, EpotTotForB, SumKCi,&
                  fSwitch, WPi, SumBnor, SumKcTopSF, fCCx
@@ -2813,16 +2820,17 @@ real(dp) function Bnormalized(TheDaysToCCini, TheGDDaysToCCini,&
      end if
 
      ! 2. Open Temperature file
-     if ((GetTemperatureFile() /= '(None)') .and. &
-         (GetTemperatureFile() /= '(External)')) then
-        if (ReferenceClimate .eqv. .true.) then
-            open(newunit=fTemp, file=trim(GetPathNameSimul()//'TCropReference.SIM'), &
-                 status='old', action='read', iostat=rc)
-        else
-            open(newunit=fTemp, file=trim(GetPathNameSimul()//'TCrop.SIM'), &
-                 status='old', action='read', iostat=rc)
-        end if
-     end if
+     ! RPK fix 22 - these two files are no longer created
+!    if ((GetTemperatureFile() /= '(none)') .and. &
+!        (GetTemperatureFile() /= '(external)')) then
+!       if (ReferenceClimate .eqv. .true.) then
+!           open(newunit=fTemp, file=trim(GetPathNameSimul()//'TCropReference.SIM'), &
+!                status='old', action='read', iostat=rc)
+!       else
+!           open(newunit=fTemp, file=trim(GetPathNameSimul()//'TCrop.SIM'), &
+!                status='old', action='read', iostat=rc)
+!       end if
+!    end if
 
      ! 3. Initialize
      SumKcTopSF = (1._dp - real(StressInPercent, kind=dp)/100._dp) * SumKcTop
@@ -2883,23 +2891,51 @@ real(dp) function Bnormalized(TheDaysToCCini, TheGDDaysToCCini,&
          CCinitial = CCoadj
      end if
 
+     ! RPK fix 22
+     j = 0
+
      ! 5. Calculate Bnormalized
      do Dayi = 1, L1234
          ! 5.1 growing degrees for dayi
-         if (GetTemperatureFile() == '(None)') then
+         if (GetTemperatureFile() == '(none)') then
              GDDi = DegreesDay(Tbase, Tupper, TDayMin, TDayMax,&
                                GetSimulParam_GDDMethod())
-         elseif (GetTemperatureFile() == '(External)') then 
+         elseif (GetTemperatureFile() == '(external)') then 
              Tndayi = real(GetTminRun_i(GetCrop_Day1()-GetSimulation_FromDayNr()+Dayi),kind=dp)
              Txdayi = real(GetTmaxRun_i(GetCrop_Day1()-GetSimulation_FromDayNr()+Dayi),kind=dp)
              GDDi = DegreesDay(Tbase, Tupper, Tndayi, Txdayi, &
                                     GetSimulParam_GDDMethod())
          else
-            read(fTemp, *, iostat=rc) Tndayi, Txdayi
-            if ((rc == iostat_end) .and. (ReferenceClimate .eqv. .true.)) then
-                rewind(fTemp)
-                read(fTemp, *, iostat=rc) Tndayi, Txdayi
-            end if
+            ! RPK fix 22
+!           read(fTemp, *, iostat=rc) Tndayi, Txdayi
+!           if ((rc == iostat_end) .and. (ReferenceClimate .eqv. .true.)) then
+!               rewind(fTemp)
+!               read(fTemp, *, iostat=rc) Tndayi, Txdayi
+!           end if
+
+            ! RPK Fix 22
+            j = j + 1
+            if (ReferenceClimate .eqv. .true.) then
+                ! RPK fix 24 - To prevent AquaCrop crashing in cold climates
+                if (j > 365) then
+                    write(*,*) 'ERROR: Array CropReferenceRun is too small', j
+                    j = 1
+                    ! stop 1
+                endif
+
+                ! RPK Fix 22 - use temperature values from TCropReference.SIM file
+                Tndayi = GetTminCropReferenceRun_i(j)
+                Txdayi = GetTmaxCropReferenceRun_i(j)
+            else
+                ! RPK fix 24
+                if (j > TCropdotSIM(0,1)) j = 1
+                
+                ! RPK fix 22 - use temperature values from TCrop.SIM
+                ! this makes no sense since ReferenceClimate is set to .true.
+                Tndayi = TCropdotSIM(j,1)
+                Txdayi = TCropdotSIM(j,2)
+            end if 
+
             GDDi = DegreesDay(Tbase, Tupper, Tndayi, Txdayi,&
                               GetSimulParam_GDDMethod())
          end if
@@ -3076,10 +3112,11 @@ real(dp) function Bnormalized(TheDaysToCCini, TheGDDaysToCCini,&
      enddo
 
      ! 4. Close Temperature file
-     if ((GetTemperatureFile() /= '(None)') .and. &
-         (GetTemperatureFile() /= '(External)')) then
-         close(fTemp)
-     end if
+     ! RPK fix 22
+!    if ((GetTemperatureFile() /= '(none)') .and. &
+!        (GetTemperatureFile() /= '(external)')) then
+!        close(fTemp)
+!    end if
 
      ! 5. Export
      Bnormalized = SumBnor
@@ -3095,12 +3132,14 @@ subroutine CreateTnxReference365Days()
     type(rep_DayEventDbl), dimension(31) :: TminDataSet_temp,TmaxDataSet_temp
     real(sp) :: Tlow, Thigh
 
-    if ((FileExists(GetTnxReferenceFileFull())) .OR. (GetTnxReferenceFile() == '(External)')) then
+    ! RPK fix 22 - TnxReferenceFileFull() no longer created
+!   if ((FileExists(GetTnxReferenceFileFull())) .OR. (GetTnxReferenceFile() == '(external)')) then
         ! create SIM file
-        if (GetTnxReferenceFile() /= '(External)') then
-            totalnameOUT = trim(GetPathNameSimul()) // 'TnxReference365Days.SIM'
-            call fTnxReference365Days_open(totalnameOUT, 'w')
-        end if
+        ! RPK fix 22 - no longer needed as data is stored in global arrays
+!       if (GetTnxReferenceFile() /= '(external)') then
+!           totalnameOUT = trim(GetPathNameSimul()) // 'TnxReference365Days.SIM'
+!           call fTnxReference365Days_open(totalnameOUT, 'w')
+!       end if
         
         ! get data set for 1st month
         Monthi = 1
@@ -3121,16 +3160,19 @@ subroutine CreateTnxReference365Days()
             Thigh = real(roundc(100*TmaxDataSet_temp(i)%Param, mold=int32),kind=sp)/100._sp
             call SetTminTnxReference365DaysRun_i(DayNri,Tlow)
             call SetTmaxTnxReference365DaysRun_i(DayNri,Thigh)
-            if (GetTnxReferenceFile() /= '(External)') then
-                write(TempString, '(2f10.2)') Tlow, Thigh
-                call fTnxReference365Days_write(trim(TempString))
-            end if
+            ! RPK fix 22
+!           if (GetTnxReferenceFile() /= '(external)') then
+!               write(TempString, '(2f10.2)') Tlow, Thigh
+!               call fTnxReference365Days_write(trim(TempString))
+!           end if
         end do
-        if (GetTnxReferenceFile() /= '(External)') then
-            ! Close file
-            call fTnxReference365Days_close()
-        end if
-    end if
+        ! RPK fix 22
+!       if (GetTnxReferenceFile() /= '(external)') then
+!           ! Close file
+!           call fTnxReference365Days_close()
+!       end if
+    ! RPK fix 22
+!   end if
 end subroutine CreateTnxReference365Days
 
 
@@ -3150,27 +3192,31 @@ subroutine CreateTnxReferenceFile(TemperatureFile, TnxReferenceFile, TnxReferenc
     integer(int32), dimension(12) :: MonthNrYears
     character(len=:), allocatable :: TempString
     character(len=1025) :: TempString2
+    integer(int32) :: j ! RPK fix 22
 
     ! 1a. Delete existing TnxReferenceFile and adjust TnxReferenceYear
-    FullName = trim(GetPathNameSimul()) // TnxReferenceFile
-    if (FileExists(FullName)) then
-        call unlink(FullName)
-        call SetTnxReferenceYear(2000)
-    end if
+    ! RPK fix 25 - file no longer created
+!   FullName = trim(GetPathNameSimul()) // TnxReferenceFile
+!   if (FileExists(FullName)) then
+!       call unlink(FullName)
+        ! RPK fix 25 - TnxReferenceYear is set to 2000 in initial settings (no need to set it here)
+!       call SetTnxReferenceYear(2000)
+!   end if
+    ! RPK fix 25 - file no longer created
     ! 1b. Delete existing TnxReference365Days.SIM
-    FullName = trim(GetPathNameSimul()) // 'TnxReference365Days.SIM'
-    if (FileExists(FullName)) then
-        call unlink(FullName)
-    end if
+!   FullName = trim(GetPathNameSimul()) // 'TnxReference365Days.SIM'
+!   if (FileExists(FullName)) then
+!       call unlink(FullName)
+!   end if
+    ! RPK fix 25 - file no longer created
     ! 1c. Delete existing TCropReference.SIM
-    FullName = trim(GetPathNameSimul()) // 'TCropReference.SIM'
-    if (FileExists(FullName)) then
-        call unlink(FullName)
-    end if
-
+!   FullName = trim(GetPathNameSimul()) // 'TCropReference.SIM'
+!   if (FileExists(FullName)) then
+!       call unlink(FullName)
+!   end if
 
     ! 2. Get Mean monthly data
-    if (TemperatureFile /= '(None)') then
+    if (TemperatureFile /= '(none)') then
         ! 2.a Preparation
         ! Get Number of Years
         NrYears = GetTemperatureRecord_ToY() - GetTemperatureRecord_FromY() + 1
@@ -3222,22 +3268,32 @@ subroutine CreateTnxReferenceFile(TemperatureFile, TnxReferenceFile, TnxReferenc
         end select
             
         ! open temperature file
-        open(newunit=fhandle, file=trim(GetTemperatureFilefull()), &
-                     status='old', action='read', iostat=rc)
-        read(fhandle, *, iostat=rc) ! Description
-        read(fhandle, *, iostat=rc) ! Data type
-        read(fhandle, *, iostat=rc) ! Day
-        read(fhandle, *, iostat=rc) ! Month
-        read(fhandle, *, iostat=rc) ! Year
-        read(fhandle, *, iostat=rc) ! Title
-        read(fhandle, *, iostat=rc) ! Title
-        read(fhandle, *, iostat=rc) ! Title
+        ! RPK fix 22 - Don't read temperature file again, obtain values from TminFull and TmaxFull 
+!       open(newunit=fhandle, file=trim(GetTemperatureFilefull()), &
+!                    status='old', action='read', iostat=rc)
+!       read(fhandle, *, iostat=rc) ! Description
+!       read(fhandle, *, iostat=rc) ! Data type
+!       read(fhandle, *, iostat=rc) ! Day
+!       read(fhandle, *, iostat=rc) ! Month
+!       read(fhandle, *, iostat=rc) ! Year
+!       read(fhandle, *, iostat=rc) ! Title
+!       read(fhandle, *, iostat=rc) ! Title
+!       read(fhandle, *, iostat=rc) ! Title
 
         ! 2.b Determine mean monthly data
-        do while (rc /= iostat_end)
+        ! RPK fix 22
+        j = 0
+!       do while (rc /= iostat_end)
+        do while (j /= GetTemperatureRecord_NrObs())
             ! read data
-            read(fhandle, *, iostat=rc) Val1, Val2 ! Tmin, Tmax
-            if (rc == iostat_end) exit
+            ! RPK fix 22
+!           read(fhandle, *, iostat=rc) Val1, Val2 ! Tmin, Tmax
+            j = j + 1
+            Val1 = TminFull(j)
+            Val2 = TmaxFull(j)
+
+            ! RPK fix 22
+!           if (rc == iostat_end) exit
             SUM1 = SUM1 + Val1 ! minimum temperature
             SUM2 = SUM2 + Val2 ! maximum temperature
             ! check end of month
@@ -3255,9 +3311,10 @@ subroutine CreateTnxReferenceFile(TemperatureFile, TnxReferenceFile, TnxReferenc
             case (datatype_monthly)
                 EndMonth = .true.
             end select
-            if (rc == iostat_end) then
-                EndMonth = .true.
-            end if
+            ! RPK Fix 22
+!            if (rc == iostat_end) then
+!               EndMonth = .true.
+!           end if
             ! End of Month
             if (EndMonth .eqv. .true.) then
                 ! mean monthly values Tmin and Tmax
@@ -3303,33 +3360,41 @@ subroutine CreateTnxReferenceFile(TemperatureFile, TnxReferenceFile, TnxReferenc
         end do
         
         ! close temperature file
-        close(fhandle)
+        ! RPK fix 022
+!       close(fhandle)
     end if
+
     ! 3. Create and Save TnxReference File
-    if (TemperatureFile /= '(None)') then
+    if (TemperatureFile /= '(none)') then
         ! Determine Name of TnxReference File
+        ! RPK fix 25 - DO NOT comment out these lines else AquaCrop produces incorrecr results for the alfalfa/Ottawa test case
         i = len(trim(TemperatureFile))
         TempString = trim(TemperatureFile)
         call SetTnxReferenceFile(TempString(:i-4) // 'Reference.Tnx')
         FullName = trim(GetPathNameSimul()) // GetTnxReferenceFile()
         call SetTnxReferenceFileFull(FullName)
+
+        ! RPK fix 22 - Don't create the *.Reference.Tnx file
+        ! Rather use the variables stored in the two global arrays 
         ! Save mean monhtly data data
-        call fTnxReference_open(FullName, 'w')
-        call fTnxReference_write('Reference : ' // trim(GetTemperatureDescription()))
-        call fTnxReference_write('     3  : Monthly records (1=daily, 2=10-daily and 3=monthly data)')
-        call fTnxReference_write('     1  : First day of record (1, 11 or 21 for 10-day or 1 for months)')
-        call fTnxReference_write('     1  : First month of record')
-        call fTnxReference_write('  1901  : First year of record (1901 if not linked to a specific year)')
-        call fTnxReference_write('')
-        call fTnxReference_write('  Tmin (C)   TMax (C) ')
-        call fTnxReference_write('  =======================')
+!       call fTnxReference_open(FullName, 'w')
+!       call fTnxReference_write('Reference : ' // trim(GetTemperatureDescription()))
+!       call fTnxReference_write('     3  : Monthly records (1=daily, 2=10-daily and 3=monthly data)')
+!       call fTnxReference_write('     1  : First day of record (1, 11 or 21 for 10-day or 1 for months)')
+!       call fTnxReference_write('     1  : First month of record')
+!       call fTnxReference_write('  1901  : First year of record (1901 if not linked to a specific year)')
+!       call fTnxReference_write('')
+!       call fTnxReference_write('  Tmin (C)   TMax (C) ')
+!       call fTnxReference_write('  =======================')
         do Monthi = 1, 12
-            write(TempString2, '(2f10.2)') MonthVal1(Monthi), MonthVal2(Monthi)
-            call fTnxReference_write(trim(TempString2))
+            ! RPK fix 22
+!           write(TempString2, '(2f10.2)') MonthVal1(Monthi), MonthVal2(Monthi)
+!           call fTnxReference_write(trim(TempString2))
             call SetTminTnxReference12MonthsRun_i(Monthi,real(roundc(100*MonthVal1(Monthi),mold=int32),kind=sp)/100._sp)
             call SetTmaxTnxReference12MonthsRun_i(Monthi,real(roundc(100*MonthVal2(Monthi),mold=int32),kind=sp)/100._sp)
         end do
-        call fTnxReference_close()
+        ! RPK fix 22
+!       call fTnxReference_close()
     end if
 end subroutine CreateTnxReferenceFile
 
@@ -3465,85 +3530,91 @@ end subroutine SetTmaxDataSet_Param
 
 
 ! fTnxReference
-
-subroutine fTnxReference_open(filename, mode)
-    !! Opens the given file, assigning it to the 'fTnxReference' file handle.
-    character(len=*), intent(in) :: filename
-        !! name of the file to assign the file handle to
-    character, intent(in) :: mode
-        !! open the file for reading ('r'), writing ('w') or appending ('a')
-
-    call open_file(fTnxReference, filename, mode, fTnxReference_iostat)
-end subroutine fTnxReference_open
-
-
-subroutine fTnxReference_write(line, advance_in)
-    !! Writes the given line to the fTnxReference file.
-    character(len=*), intent(in) :: line
-        !! line to write
-    logical, intent(in), optional :: advance_in
-        !! whether or not to append a newline character
-
-    logical :: advance
-
-    if (present(advance_in)) then
-        advance = advance_in
-    else
-        advance = .true.
-    end if
-    call write_file(fTnxReference, line, advance, fTnxReference_iostat)
-end subroutine fTnxReference_write
+! RPK fix 25 - No longer needed
+!subroutine fTnxReference_open(filename, mode)
+!    !! Opens the given file, assigning it to the 'fTnxReference' file handle.
+!    character(len=*), intent(in) :: filename
+!        !! name of the file to assign the file handle to
+!    character, intent(in) :: mode
+!        !! open the file for reading ('r'), writing ('w') or appending ('a')
+!
+!    call open_file(fTnxReference, filename, mode, fTnxReference_iostat)
+!end subroutine fTnxReference_open
 
 
-subroutine fTnxReference_close()
-    close(fTnxReference)
-end subroutine fTnxReference_close
+! RPK fix 25 - No longer needed
+!subroutine fTnxReference_write(line, advance_in)
+!    !! Writes the given line to the fTnxReference file.
+!    character(len=*), intent(in) :: line
+!        !! line to write
+!    logical, intent(in), optional :: advance_in
+!        !! whether or not to append a newline character
+!
+!    logical :: advance
+!
+!    if (present(advance_in)) then
+!        advance = advance_in
+!    else
+!        advance = .true.
+!    end if
+!    call write_file(fTnxReference, line, advance, fTnxReference_iostat)
+!end subroutine fTnxReference_write
 
 
-subroutine fTnxReference_erase()
-    call unlink(GetTnxReferenceFileFull())
-end subroutine fTnxReference_erase
+! RPK fix 25 - No longer needed
+!subroutine fTnxReference_close()
+!    close(fTnxReference)
+!end subroutine fTnxReference_close
+
+
+! RPK fix 25 - never called
+!subroutine fTnxReference_erase()
+!    call unlink(GetTnxReferenceFileFull())
+!end subroutine fTnxReference_erase
 
 
 ! fTnxReference365Days
-
-subroutine fTnxReference365Days_open(filename, mode)
-    !! Opens the given file, assigning it to the 'fTnxReference365Days' file handle.
-    character(len=*), intent(in) :: filename
-        !! name of the file to assign the file handle to
-    character, intent(in) :: mode
-        !! open the file for reading ('r'), writing ('w') or appending ('a')
-
-    call open_file(fTnxReference365Days, filename, mode, fTnxReference365Days_iostat)
-end subroutine fTnxReference365Days_open
-
-
-subroutine fTnxReference365Days_write(line, advance_in)
-    !! Writes the given line to the fTnxReference365Days file.
-    character(len=*), intent(in) :: line
-        !! line to write
-    logical, intent(in), optional :: advance_in
-        !! whether or not to append a newline character
-
-    logical :: advance
-
-    if (present(advance_in)) then
-        advance = advance_in
-    else
-        advance = .true.
-    end if
-    call write_file(fTnxReference365Days, line, advance, fTnxReference365Days_iostat)
-end subroutine fTnxReference365Days_write
+! RPK fix 25 - no longer needed
+!subroutine fTnxReference365Days_open(filename, mode)
+!    !! Opens the given file, assigning it to the 'fTnxReference365Days' file handle.
+!    character(len=*), intent(in) :: filename
+!        !! name of the file to assign the file handle to
+!    character, intent(in) :: mode
+!        !! open the file for reading ('r'), writing ('w') or appending ('a')
+!
+!    call open_file(fTnxReference365Days, filename, mode, fTnxReference365Days_iostat)
+!end subroutine fTnxReference365Days_open
 
 
-subroutine fTnxReference365Days_close()
-    close(fTnxReference365Days)
-end subroutine fTnxReference365Days_close
+! RPK fix 25 - no longer needed
+!subroutine fTnxReference365Days_write(line, advance_in)
+!    !! Writes the given line to the fTnxReference365Days file.
+!    character(len=*), intent(in) :: line
+!        !! line to write
+!    logical, intent(in), optional :: advance_in
+!        !! whether or not to append a newline character
+!
+!    logical :: advance
+!
+!    if (present(advance_in)) then
+!        advance = advance_in
+!    else
+!        advance = .true.
+!    end if
+!    call write_file(fTnxReference365Days, line, advance, fTnxReference365Days_iostat)
+!end subroutine fTnxReference365Days_write
 
 
-subroutine fTnxReference365Days_erase()
-    call unlink(GetTnxReference365DaysFileFull())
-end subroutine fTnxReference365Days_erase
+! RPK fix 25 - no longer needed
+!subroutine fTnxReference365Days_close()
+!    close(fTnxReference365Days)
+!end subroutine fTnxReference365Days_close
+
+
+! RPK fix 25 - never called
+!subroutine fTnxReference365Days_erase()
+!    call unlink(GetTnxReference365DaysFileFull())
+!end subroutine fTnxReference365Days_erase
 
 
 subroutine GetMonthlyTemperatureDataSetFromTnxReferenceFile(Monthi, TminDataSet, TmaxDataSet)
@@ -3588,9 +3659,9 @@ subroutine GetMonthlyTemperatureDataSetFromTnxReferenceFile(Monthi, TminDataSet,
     call DetermineDayNr(1, Monthi, 1901, DNR)
     DayN = DaysInMonth(Monthi)
 
-    call GetInterpolationParameters(C1Min, C2Min, C3Min, &
+    call GetInterpolationParams(C1Min, C2Min, C3Min, &
                    aOver3Min, bOver2Min, cMin)
-    call GetInterpolationParameters(C1Max, C2Max, C3Max, &
+    call GetInterpolationParams(C1Max, C2Max, C3Max, &
                    aOver3Max, bOver2Max, cMax)
 
     t1 = 30
@@ -3614,7 +3685,7 @@ subroutine GetMonthlyTemperatureDataSetFromTnxReferenceFile(Monthi, TminDataSet,
     contains
 
 
-    subroutine GetInterpolationParameters(C1, C2, C3, &
+    subroutine GetInterpolationParams(C1, C2, C3, &
                           aOver3, bOver2, c)
         real(dp), intent(in) :: C1
         real(dp), intent(in) :: C2
@@ -3627,7 +3698,7 @@ subroutine GetMonthlyTemperatureDataSetFromTnxReferenceFile(Monthi, TminDataSet,
         aOver3 = (C1-2._dp*C2+C3)/(6._dp*30._dp*30._dp*30._dp)
         bOver2 = (-6._dp*C1+9._dp*C2-3._dp*C3)/(6._dp*30._dp*30._dp)
         c = (11._dp*C1-7._dp*C2+2._dp*C3)/(6._dp*30._dp)
-    end subroutine GetInterpolationParameters
+    end subroutine GetInterpolationParams
 end subroutine GetMonthlyTemperatureDataSetFromTnxReferenceFile
 
 end module ac_tempprocessing
