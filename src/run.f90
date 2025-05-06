@@ -4,6 +4,7 @@ use ac_climprocessing, only:    GetDecadeEToDataset, &
                                 GetDecadeRainDataSet, &
                                 GetMonthlyEToDataset, &
                                 GetMonthlyRainDataset
+
 use ac_global, only:    AdjustSizeCompartments, &
                         ac_zero_threshold, &
                         GetCrop_DaysToHIo, &
@@ -85,6 +86,7 @@ use ac_global, only:    AdjustSizeCompartments, &
                         GetETo, &
                         GetEToFile, &
                         GetEToFilefull, &
+                        EToFull, &                ! RPK fix 20 
                         GetEToRecord_DataType, &
                         GetEToRecord_FromDayNr, &
                         GetManagement_FertilityStress, &
@@ -116,6 +118,7 @@ use ac_global, only:    AdjustSizeCompartments, &
                         GetRain, &
                         GetRainFile, &
                         GetRainFilefull, &
+                        RainFull, &                ! RPK fix 20 
                         GetRainRecord_DataType, &
                         GetRainRecord_FromDayNr, &
                         GetRootingDepth, &
@@ -167,6 +170,8 @@ use ac_global, only:    AdjustSizeCompartments, &
                         GetTactWeedInfested, &
                         GetTemperatureFile, &
                         GetTemperatureFilefull, &
+                        TminFull, &                ! RPK fix 20
+                        TmaxFull, &                ! RPK fix 20
                         GetTemperatureRecord_DataType, &
                         GetTemperatureRecord_FromDayNr, &
                         GetTmax, &
@@ -523,14 +528,17 @@ integer :: fRun  ! file handle
 integer :: fRun_iostat  ! IO status
 integer :: fIrri  ! file handle
 integer :: fIrri_iostat  ! IO status
-integer :: fEToSIM ! file handle
-integer :: fEToSIM_iostat ! IO status
+! RPK fix 21 - no longer needed
+!integer :: fEToSIM ! file handle
+!integer :: fEToSIM_iostat ! IO status
 integer :: fEval ! file handle
 integer :: fEval_iostat ! IO status
-integer :: fRainSIM ! file handle
-integer :: fRainSIM_iostat ! IO status
-integer :: fTempSIM ! file handle
-integer :: fTempSIM_iostat ! IO status
+! RPK fix 21 - no longer needed
+!integer :: fRainSIM ! file handle
+!integer :: fRainSIM_iostat ! IO status
+! RPK fix 21 - no longer needed
+!integer :: fTempSIM ! file handle
+!integer :: fTempSIM_iostat ! IO status
 integer :: fCuts ! file handle
 integer :: fCuts_iostat ! IO status
 integer :: fObs ! file handle
@@ -594,6 +602,7 @@ logical :: NoYear
 
 character(len=:), allocatable :: fEval_filename
 
+logical :: TemperatureFilefull_exists ! RPK fix 20
 logical :: WaterTableInProfile, StartMode, NoMoreCrop
 logical :: GlobalIrriECw ! for versions before 3.2 where EC of
                          ! irrigation water was not yet recorded
@@ -807,81 +816,87 @@ end subroutine fIrri_close
 
 
 ! fEToSIM
-
-subroutine fEToSIM_open(filename, mode)
-    !! Opens the given file, assigning it to the 'fEToSIM' file handle.
-    character(len=*), intent(in) :: filename
-        !! name of the file to assign the file handle to
-    character, intent(in) :: mode
-        !! open the file for reading ('r'), writing ('w') or appending ('a')
-    call open_file(fEToSIM, filename, mode, fEToSIM_iostat)
-end subroutine fEToSIM_open
-
-
-function fEToSIM_read() result(line)
-    !! Returns the next line read from the 'fEToSIM' file.
-    character(len=:), allocatable :: line
-        !! name of the file to assign the file handle to
-
-    line = read_file(fEToSIM, fEToSIM_iostat)
-end function fEToSIM_read
+! RPK fix 21 - subroutione no longer needed
+!subroutine fEToSIM_open(filename, mode)
+!    !! Opens the given file, assigning it to the 'fEToSIM' file handle.
+!    character(len=*), intent(in) :: filename
+!        !! name of the file to assign the file handle to
+!    character, intent(in) :: mode
+!        !! open the file for reading ('r'), writing ('w') or appending ('a')
+!    call open_file(fEToSIM, filename, mode, fEToSIM_iostat)
+!end subroutine fEToSIM_open
 
 
-subroutine fEToSIM_close()
-    close(fEToSIM)
-end subroutine fEToSIM_close
+! RPK fix 21 - subroutione no longer needed
+! result(line)
+!    !! Returns the next line read from the 'fEToSIM' file.
+!    character(len=:), allocatable :: line
+!        !! name of the file to assign the file handle to
+!
+!    line = read_file(fEToSIM, fEToSIM_iostat)
+!end function fEToSIM_read
+
+
+! RPK fix 21 - subroutione no longer needed
+!subroutine fEToSIM_close()
+!    close(fEToSIM)
+!end subroutine fEToSIM_close
 
 
 ! fTempSIM
-
-subroutine fTempSIM_open(filename, mode)
-    !! Opens the given file, assigning it to the 'fTempSIM' file handle.
-    character(len=*), intent(in) :: filename
-        !! name of the file to assign the file handle to
-    character, intent(in) :: mode
-        !! open the file for reading ('r'), writing ('w') or appending ('a')
-    call open_file(fTempSIM, filename, mode, fTempSIM_iostat)
-end subroutine fTempSIM_open
-
-
-function fTempSIM_read() result(line)
-    !! Returns the next line read from the 'fTempSIM' file.
-    character(len=:), allocatable :: line
-        !! name of the file to assign the file handle to
-
-    line = read_file(fTempSIM, fTempSIM_iostat)
-end function fTempSIM_read
+! RPK fix 21 - subroutione no longer needed
+!subroutine fTempSIM_open(filename, mode)
+!    !! Opens the given file, assigning it to the 'fTempSIM' file handle.
+!    character(len=*), intent(in) :: filename
+!        !! name of the file to assign the file handle to
+!    character, intent(in) :: mode
+!        !! open the file for reading ('r'), writing ('w') or appending ('a')
+!    call open_file(fTempSIM, filename, mode, fTempSIM_iostat)
+!end subroutine fTempSIM_open
 
 
-subroutine fTempSIM_close()
-    close(fTempSIM)
-end subroutine fTempSIM_close
+! RPK fix 21 - subroutione no longer needed
+!function fTempSIM_read() result(line)
+!    !! Returns the next line read from the 'fTempSIM' file.
+!    character(len=:), allocatable :: line
+!        !! name of the file to assign the file handle to
+!
+!    line = read_file(fTempSIM, fTempSIM_iostat)
+!end function fTempSIM_read
+
+
+! RPK fix 21 - subroutione no longer needed
+!subroutine fTempSIM_close()
+!    close(fTempSIM)
+!end subroutine fTempSIM_close
 
 
 ! fRainSIM
-
-subroutine fRainSIM_open(filename, mode)
-    !! Opens the given file, assigning it to the 'fRainSIM' file handle.
-    character(len=*), intent(in) :: filename
-        !! name of the file to assign the file handle to
-    character, intent(in) :: mode
-        !! open the file for reading ('r'), writing ('w') or appending ('a')
-    call open_file(fRainSIM, filename, mode, fRainSIM_iostat)
-end subroutine fRainSIM_open
-
-
-function fRainSIM_read() result(line)
-    !! Returns the next line read from the 'fRainSIM' file.
-    character(len=:), allocatable :: line
-        !! name of the file to assign the file handle to
-
-    line = read_file(fRainSIM, fRainSIM_iostat)
-end function fRainSIM_read
+! RPK fix 21 - subroutione no longer needed
+!subroutine fRainSIM_open(filename, mode)
+!    !! Opens the given file, assigning it to the 'fRainSIM' file handle.
+!    character(len=*), intent(in) :: filename
+!        !! name of the file to assign the file handle to
+!    character, intent(in) :: mode
+!        !! open the file for reading ('r'), writing ('w') or appending ('a')
+!    call open_file(fRainSIM, filename, mode, fRainSIM_iostat)
+!end subroutine fRainSIM_open
 
 
-subroutine fRainSIM_close()
-    close(fRainSIM)
-end subroutine fRainSIM_close
+! RPK fix 21 - subroutione no longer needed
+!function fRainSIM_read() result(line)
+!    !! Returns the next line read from the 'fRainSIM' file.
+!    character(len=:), allocatable :: line
+!        !! name of the file to assign the file handle to
+!
+!    line = read_file(fRainSIM, fRainSIM_iostat)
+!end function fRainSIM_read
+
+
+! RPK fix 21 - subroutione no longer needed
+!subroutine fRainSIM_close()
+!    close(fRainSIM)
+!end subroutine fRainSIM_close
 
 
 ! fCuts
@@ -3451,7 +3466,7 @@ subroutine GetGwtSet(DayNrIN, GwT)
     logical :: TheEnd
 
     ! FileNameFull
-    if (GetGroundWaterFile() /= '(None)') then
+    if (GetGroundWaterFile() /= '(none)') then
         FileNameFull = GetGroundWaterFileFull()
     else
         FileNameFull = trim(GetPathNameProg())//'GroundWater.AqC'
@@ -3724,8 +3739,8 @@ subroutine GetSumGDDBeforeSimulation(SumGDDtillDay, SumGDDtillDayM1)
                                             TminDataSet_temp
 
     call SetSimulation_SumGDD(0._dp)
-    if ((GetTemperatureFile() /= '(None)') .and.&
-        (GetTemperatureFile() /= '(External)')) then
+    if ((GetTemperatureFile() /= '(none)') .and.&
+        (GetTemperatureFile() /= '(external)')) then
         totalname = GetTemperatureFilefull()
 
         if (FileExists(totalname)) then
@@ -3840,7 +3855,7 @@ subroutine GetSumGDDBeforeSimulation(SumGDDtillDay, SumGDDtillDayM1)
             end select
         end if
     end if
-    if (GetTemperatureFile() == '(None)') then
+    if (GetTemperatureFile() == '(none)') then
         call SetSimulation_SumGDD(DegreesDay(&
                                  GetCrop_Tbase(), GetCrop_Tupper(), &
                                  GetSimulParam_Tmin(), GetSimulParam_Tmax(), &
@@ -3857,7 +3872,7 @@ subroutine GetSumGDDBeforeSimulation(SumGDDtillDay, SumGDDtillDayM1)
         if (SumGDDtillDayM1 < 0._dp) then
             SumGDDtillDayM1 = 0._dp
         end if
-    else if (GetTemperatureFile() == '(External)') then
+    else if (GetTemperatureFile() == '(external)') then
         SumGDDtillDay = GetSimulation_SumGDD()
         SumGDDtillDayM1 = SumGDDtillDay &
                          - DegreesDay(GetCrop_Tbase(), GetCrop_Tupper(), &
@@ -4287,11 +4302,13 @@ subroutine FinalizeRun2(NrRun, TheProjectType)
     integer(int8), intent(in) :: NrRun
     integer(intenum), intent(in) :: TheProjectType
 
-    call CloseClimateFiles()
+    ! RPK fix 21
+    ! no need to close the temporary climate (*Data.SIM) files as they are no longer created
+!   call CloseClimateFiles()
     call CloseIrrigationFile()
     call CloseManagementFile()
 
-    if (GetPart2Eval() .and. (GetObservationsFile() /= '(None)')) then
+    if (GetPart2Eval() .and. (GetObservationsFile() /= '(none)')) then
         call CloseEvalDataPerformEvaluation(NrRun)
     end if
 
@@ -4336,17 +4353,18 @@ subroutine FinalizeRun2(NrRun, TheProjectType)
     end subroutine CloseEvalDataPerformEvaluation
 
 
-    subroutine CloseClimateFiles()
-        if (GetEToFile() /= '(None)') then
-            call fEToSIM_close()
-        end if
-        if (GetRainFile() /= '(None)') then
-            call fRainSIM_close()
-        end if
-        if (GetTemperatureFile() /= '(None)') then
-            call fTempSIM_close()
-        end if
-    end subroutine CloseClimateFiles
+    ! RPK fix 21 - subroutione no longer needed
+!   subroutine CloseClimateFiles()
+!       if (GetEToFile() /= '(none)') then
+!           call fEToSIM_close()
+!       end if
+!       if (GetRainFile() /= '(none)') then
+!           call fRainSIM_close()
+!       end if
+!       if (GetTemperatureFile() /= '(none)') then
+!           call fTempSIM_close()
+!       end if
+!   end subroutine CloseClimateFiles
 
 
     subroutine CloseIrrigationFile()
@@ -4377,7 +4395,7 @@ subroutine OpenIrrigationFile()
 
     if ((GetIrriMode() == IrriMode_Manual) &
         .or. (GetIrriMode() == IrriMode_Generate)) then
-        if (GetIrriFile() /= '(None)') then
+        if (GetIrriFile() /= '(none)') then
             totalname = GetIrriFileFull()
         else
             totalname = GetPathNameProg() // 'IrriSchedule.AqC'
@@ -4588,7 +4606,9 @@ subroutine WriteTheResults(ANumber, Day1, Month1, Year1, DayN, MonthN, &
         end select
         call fRun_write(trim(TempString), .false.)
     else
-        write(TempString, '(i0)') ANumber
+        ! RPK fix 08
+        ! write(TempString, '(i0)') ANumber
+        write(TempString, '(i3.3)') ANumber
         TempString = 'Tot(' // trim(TempString) // ')'
         do while (len(trim(TempString)) < 9)
             TempString = ' ' // trim(TempString)
@@ -4686,8 +4706,12 @@ subroutine WriteTheResults(ANumber, Day1, Month1, Year1, DayN, MonthN, &
                                      GetSimulation_Storage_Btotal()
         call fRun_write(trim(TempString), .false.)
     else
-        write(TempString, '(f9.1, 4i9, 2f9.3)') HI, undef_int, undef_int, undef_int, &
-                                          undef_int, BmobPer, BstoPer
+! RPK fix 01
+! extra variable in monthly output after WPet with value -9 (unknown)
+!        write(TempString, '(f9.1, 4i9, 2f9.3)') HI, undef_int, undef_int, undef_int, &
+!                                          undef_int, BmobPer, BstoPer
+        write(TempString, '(f9.1, 3i9, 2f9.3)') HI, undef_int, undef_int, undef_int, &
+                                          BmobPer, BstoPer
         call fRun_write(trim(TempString), .false.)
     end if
 
@@ -4768,8 +4792,8 @@ subroutine InitializeSimulationRunPart1()
     call SetSimulation_DelayedDays(0)
 
     ! 3. create temperature file covering crop cycle
-    if ((GetTemperatureFile() /= '(None)') .and.&
-        (GetTemperatureFile() /= '(External)')) then
+    if ((GetTemperatureFile() /= '(none)') .and.&
+        (GetTemperatureFile() /= '(external)')) then
         if (GetSimulation_ToDayNr() < GetCrop_DayN()) then
             call TemperatureFileCoveringCropPeriod(GetCrop_Day1(), &
                        GetSimulation_TodayNr())
@@ -5568,33 +5592,42 @@ subroutine CreateDailyClimFiles(FromSimDay, ToSimDay)
     character(len=255) :: StringREAD
     integer(int32) :: i
     integer(int32) :: RunningDay
-    real(dp) :: tmpRain
+    ! RPK fix 20
+    ! variable tmpRain renamed to Rain_temp to match ETo_temp, Tmin_temp, Tmax_temp
+    real(dp) :: Rain_temp
     real(dp) :: ETo_temp
     type(rep_DayEventDbl), dimension(31) :: TminDataSet_temp, TmaxDataSet_temp
     real(dp) :: Tmin_temp, Tmax_temp
     type(rep_DayEventDbl), dimension(31) :: EToDataSet_temp, RainDataSet_temp
 
     ! 1. ETo file
-    if (GetEToFile() /= '(None)') then
+    if (GetEToFile() /= '(none)') then
         totalname = GetEToFilefull()
         if (FileExists(totalname)) then
             ! open file and find first day of simulation period
             select case (GetEToRecord_DataType())
             case(datatype_Daily)
-                open(newunit=fETo, file=trim(totalname), status='old', &
-                                                         action='read')
-                read(fETo, *, iostat=rc) ! description
-                read(fETo, *, iostat=rc) ! time step
-                read(fETo, *, iostat=rc) ! day
-                read(fETo, *, iostat=rc) ! month
-                read(fETo, *, iostat=rc) ! year
-                read(fETo, *, iostat=rc)
-                read(fETo, *, iostat=rc)
-                read(fETo, *, iostat=rc)
-                do i = GetEToRecord_FromDayNr(), (FromSimDay - 1)
-                    read(fETo, *, iostat=rc)
-                end do
-                read(fETo, *, iostat=rc) ETo_temp
+                ! RPK fix 20 
+!               open(newunit=fETo, file=trim(totalname), status='old', &
+!                                                        action='read')
+!               read(fETo, *, iostat=rc) ! description
+!               read(fETo, *, iostat=rc) ! time step
+!               read(fETo, *, iostat=rc) ! day
+!               read(fETo, *, iostat=rc) ! month
+!               read(fETo, *, iostat=rc) ! year
+!               read(fETo, *, iostat=rc)
+!               read(fETo, *, iostat=rc)
+!               read(fETo, *, iostat=rc)
+!               do i = GetEToRecord_FromDayNr(), (FromSimDay - 1)
+!                   read(fETo, *, iostat=rc)
+!               end do
+!               read(fETo, *, iostat=rc) ETo_temp
+
+                ! RPK fix 20
+                ! FromSimDay is the First day of simulation period (from the .PRO/.RPM file)
+                i = FromSimDay - EToFull(0)
+                ETo_temp = EToFull(i)
+
                 call SetETo(ETo_temp)
             case(datatype_decadely)
                 EToDataSet_temp = GetEToDataSet()
@@ -5616,31 +5649,39 @@ subroutine CreateDailyClimFiles(FromSimDay, ToSimDay)
                 call SetETo(GetEToDataSet_Param(i))
             end select
 
+            ! RPK fix 21 - no longer need to create *Data.SIM files 
             ! create SIM file and record first day
-            totalnameOUT = GetPathNameSimul() // 'EToData.SIM'
-            open(newunit=fEToS, file=trim(totalnameOUT), status='replace', &
-                                                         action='write')
-            write(fEToS, '(f10.4)') GetETo()
+!           totalnameOUT = GetPathNameSimul() // 'EToData.SIM'
+!           open(newunit=fEToS, file=trim(totalnameOUT), status='replace', &
+!                                                        action='write')
+!           write(fEToS, '(f10.4)') GetETo()
             ! next days of simulation period
             do RunningDay = (FromSimDay + 1), ToSimDay
                 select case (GetEToRecord_DataType())
                 case(datatype_Daily)
-                    if (rc == iostat_end) then
-                        rewind(fETo)
-                        read(fETo, *, iostat=rc) ! description
-                        read(fETo, *, iostat=rc) ! time step
-                        read(fETo, *, iostat=rc) ! day
-                        read(fETo, *, iostat=rc) ! month
-                        read(fETo, *, iostat=rc) ! year
-                        read(fETo, *, iostat=rc)
-                        read(fETo, *, iostat=rc)
-                        read(fETo, *, iostat=rc)
-                        read(fETo, *) ETo_temp
-                        call SetETo(ETo_temp)
-                    else
-                        read(fETo, *) ETo_temp
-                        call SetETo(ETo_temp)
-                    end if
+                    ! RPK fix 20
+!                   if (rc == iostat_end) then
+!                       rewind(fETo)
+!                       read(fETo, *, iostat=rc) ! description
+!                       read(fETo, *, iostat=rc) ! time step
+!                       read(fETo, *, iostat=rc) ! day
+!                       read(fETo, *, iostat=rc) ! month
+!                       read(fETo, *, iostat=rc) ! year
+!                       read(fETo, *, iostat=rc)
+!                       read(fETo, *, iostat=rc)
+!                       read(fETo, *, iostat=rc)
+!                       read(fETo, *) ETo_temp
+!                       call SetETo(ETo_temp)
+!                   else
+!                       read(fETo, *) ETo_temp
+!                       call SetETo(ETo_temp)
+!                   end if
+
+                    ! RPK fix 20
+                    ! FromSimDay is the First day of simulation period (from the .PRO/.RPM file)
+                    i = RunningDay - EToFull(0)
+                    ETo_temp = EToFull(i)
+                    call SetETo(ETo_temp)
                 case(datatype_Decadely)
                     if (RunningDay > GetEToDataSet_DayNr(31)) then
                         EToDataSet_temp = GetEToDataSet()
@@ -5664,38 +5705,47 @@ subroutine CreateDailyClimFiles(FromSimDay, ToSimDay)
                     end do
                     call SetETo(GetEToDataSet_Param(i))
                 end select
-                write(fEToS, '(f10.4)') GetETo()
+                ! RPK fix 21
+!               write(fEToS, '(f10.4)') GetETo()
             end do
             ! Close files
-            if (GetEToRecord_DataType() == datatype_Daily) then
-                close(fETo)
-            end if
-            close(fEToS)
+            ! RPK fix 20
+!           if (GetEToRecord_DataType() == datatype_Daily) then
+!              close(fETo)
+!           end if
+!           RPK fix 21
+!           close(fEToS)
         end if
     end if
 
     ! 2. Rain File
-    if (GetRainFile() /= '(None)') then
+    if (GetRainFile() /= '(none)') then
         totalname = GetRainFilefull()
         if (FileExists(totalname)) then
             ! open file and find first day of simulation period
             select case (GetRainRecord_DataType())
             case(datatype_Daily)
-                open(newunit=fRain, file=trim(totalname), status='old', &
-                                                          action='read')
-                read(fRain, *, iostat=rc) ! description
-                read(fRain, *, iostat=rc) ! time step
-                read(fRain, *, iostat=rc) ! day
-                read(fRain, *, iostat=rc) ! month
-                read(fRain, *, iostat=rc) ! year
-                read(fRain, *, iostat=rc)
-                read(fRain, *, iostat=rc)
-                read(fRain, *, iostat=rc)
-                do i = GetRainRecord_FromDayNr(), (FromSimDay - 1)
-                    read(fRain, *, iostat=rc)
-                end do
-                read(fRain, *, iostat=rc) tmpRain
-                call SetRain(tmpRain)
+                ! RPK fix 20
+!               open(newunit=fRain, file=trim(totalname), status='old', &
+!                                                         action='read')
+!               read(fRain, *, iostat=rc) ! description
+!               read(fRain, *, iostat=rc) ! time step
+!               read(fRain, *, iostat=rc) ! day
+!               read(fRain, *, iostat=rc) ! month
+!               read(fRain, *, iostat=rc) ! year
+!               read(fRain, *, iostat=rc)
+!               read(fRain, *, iostat=rc)
+!               read(fRain, *, iostat=rc)
+!               do i = GetRainRecord_FromDayNr(), (FromSimDay - 1)
+!                   read(fRain, *, iostat=rc)
+!               end do
+!               read(fRain, *, iostat=rc) Rain_temp
+
+                ! RPK fix 20
+                i = FromSimDay - RainFull(0)
+                Rain_temp = RainFull(i)
+
+                call SetRain(Rain_temp)
             case(datatype_Decadely)
                 RainDataSet_temp = GetRainDataSet()
                 call GetDecadeRainDataSet(FromSimDay, RainDataSet_temp)
@@ -5716,31 +5766,38 @@ subroutine CreateDailyClimFiles(FromSimDay, ToSimDay)
                 call SetRain(GetRainDataSet_Param(i))
             end select
 
+            ! RPK fix 21 - no longer need to create *Data.SIM files 
             ! create SIM file and record first day
-            totalnameOUT = GetPathNameSimul() // 'RainData.SIM'
-            open(newunit=fRainS, file=trim(totalnameOUT), status='replace', &
-                                                          action='write')
-            write(fRainS, '(f10.4)') GetRain()
+!           totalnameOUT = GetPathNameSimul() // 'RainData.SIM'
+!           open(newunit=fRainS, file=trim(totalnameOUT), status='replace', &
+!                                                         action='write')
+!           write(fRainS, '(f10.4)') GetRain()
             ! next days of simulation period
             do RunningDay = (FromSimDay + 1), ToSimDay
                 select case (GetRainRecord_DataType())
                 case(datatype_daily)
-                    if (rc == iostat_end) then
-                        rewind(fRain)
-                        read(fRain, *, iostat=rc) ! description
-                        read(fRain, *, iostat=rc) ! time step
-                        read(fRain, *, iostat=rc) ! day
-                        read(fRain, *, iostat=rc) ! month
-                        read(fRain, *, iostat=rc) ! year
-                        read(fRain, *, iostat=rc)
-                        read(fRain, *, iostat=rc)
-                        read(fRain, *, iostat=rc)
-                        read(fRain, *, iostat=rc) tmpRain
-                        call SetRain(tmpRain)
-                    else
-                        read(fRain, *, iostat=rc) tmpRain
-                        call SetRain(tmpRain)
-                    end if
+                    ! RPK fix 20
+!                   if (rc == iostat_end) then
+!                       rewind(fRain)
+!                       read(fRain, *, iostat=rc) ! description
+!                       read(fRain, *, iostat=rc) ! time step
+!                       read(fRain, *, iostat=rc) ! day
+!                       read(fRain, *, iostat=rc) ! month
+!                       read(fRain, *, iostat=rc) ! year
+!                       read(fRain, *, iostat=rc)
+!                       read(fRain, *, iostat=rc)
+!                       read(fRain, *, iostat=rc)
+!                       read(fRain, *, iostat=rc) Rain_temp
+!                       call SetRain(Rain_temp)
+!                   else
+!                       read(fRain, *, iostat=rc) Rain_temp
+!                       call SetRain(Rain_temp)
+!                   end if
+
+                    ! RPK fix 20
+                    i = RunningDay - RainFull(0)
+                    Rain_temp = RainFull(i)
+                    call SetRain(Rain_temp)
                 case(datatype_Decadely)
                     if (RunningDay > GetRainDataSet_DayNr(31)) then
                         RainDataSet_temp = GetRainDataSet()
@@ -5764,41 +5821,56 @@ subroutine CreateDailyClimFiles(FromSimDay, ToSimDay)
                     end do
                     call SetRain(GetRainDataSet_Param(i))
                 end select
-                write(fRainS, '(f10.4)') GetRain()
+                ! RPK fix 21
+!               write(fRainS, '(f10.4)') GetRain()
             end do
             ! Close files
-            if (GetRainRecord_DataType() == datatype_Daily) then
-                close(fRain)
-            end if
-            close(fRainS)
+            ! RPK fix 20
+!           if (GetRainRecord_DataType() == datatype_Daily) then
+!               close(fRain)
+!           end if
+            ! RPK fix 21
+!           close(fRainS)
         end if
     end if
 
     ! 3. Temperature file
-    if ((GetTemperatureFile() /= '(None)') .and.&
-        (GetTemperatureFile() /= '(External)')) then
+    if ((GetTemperatureFile() /= '(none)') .and.&
+        (GetTemperatureFile() /= '(external)')) then
+! RPK fix 20
+! ReadClimateFilefull() is called from tempprocessing.f90, which is run BEFORE climprocessing.f90
+
         totalname = GetTemperatureFilefull()
         if (FileExists(totalname)) then
             ! open file and find first day of simulation period
             select case (GetTemperatureRecord_DataType())
             case(datatype_daily)
-                open(newunit=fTemp, file=trim(totalname), status='old', &
-                                                          action='read')
-                read(fTemp, *, iostat=rc) ! description
-                read(fTemp, *, iostat=rc) ! time step
-                read(fTemp, *, iostat=rc) ! day
-                read(fTemp, *, iostat=rc) ! month
-                read(fTemp, *, iostat=rc) ! year
-                read(fTemp, *, iostat=rc)
-                read(fTemp, *, iostat=rc)
-                read(fTemp, *, iostat=rc)
-                do i = GetTemperatureRecord_FromDayNr(), (FromSimDay - 1)
-                    read(fTemp, *, iostat=rc)
-                end do
-                read(fTemp, '(a)', iostat=rc) StringREAD  ! i.e. DayNri
-                Tmin_temp = GetTmin()
-                Tmax_temp = GetTmax()
-                call SplitStringInTwoParams(StringREAD, Tmin_temp, Tmax_temp)
+                ! RPK fix 20
+!               open(newunit=fTemp, file=trim(totalname), status='old', &
+!                                                         action='read')
+!               read(fTemp, *, iostat=rc) ! description
+!               read(fTemp, *, iostat=rc) ! time step
+!               read(fTemp, *, iostat=rc) ! day
+!               read(fTemp, *, iostat=rc) ! month
+!               read(fTemp, *, iostat=rc) ! year
+!               read(fTemp, *, iostat=rc)
+!               read(fTemp, *, iostat=rc)
+!               read(fTemp, *, iostat=rc)
+!               do i = GetTemperatureRecord_FromDayNr(), (FromSimDay - 1)
+!                   read(fTemp, *, iostat=rc)
+!               end do
+!               read(fTemp, '(a)', iostat=rc) StringREAD  ! i.e. DayNri
+!               Tmin_temp = GetTmin()
+!               Tmax_temp = GetTmax()
+!               call SplitStringInTwoParams(StringREAD, Tmin_temp, Tmax_temp)
+
+                ! RPK fix 20
+                ! FromSimDay is the First day of simulation period (from the .PRO/.RPM file)
+                i = FromSimDay - TminFull(0)
+                Tmin_temp = TminFull(i)
+                i = FromSimDay - TmaxFull(0)
+                Tmax_temp = TmaxFull(i)
+
                 call SetTmin(Tmin_temp)
                 call SetTmax(Tmax_temp)
             case(datatype_Decadely)
@@ -5829,37 +5901,47 @@ subroutine CreateDailyClimFiles(FromSimDay, ToSimDay)
                 call SetTmax(GetTmaxDataSet_Param(i))
             end select
 
+            ! RPK fix 21 - no longer need to create *Data.SIM files 
             ! create SIM file and record first day
-            totalnameOUT = GetPathNameSimul() // 'TempData.SIM'
-            open(newunit=fTempS, file=trim(totalnameOUT), status='replace', &
-                                                          action='write')
-            write(fTempS, '(2f10.4)') GetTmin(), GetTmax()
+!           totalnameOUT = GetPathNameSimul() // 'TempData.SIM'
+!           open(newunit=fTempS, file=trim(totalnameOUT), status='replace', &
+!                                                         action='write')
+!           write(fTempS, '(2f10.4)') GetTmin(), GetTmax()
             ! next days of simulation period
             do RunningDay = (FromSimDay + 1), ToSimDay
                 select case (GetTemperatureRecord_Datatype())
                 case(datatype_Daily)
-                    if (rc == iostat_end) then
-                        rewind(fTemp)
-                        read(fTemp, *, iostat=rc) ! description
-                        read(fTemp, *, iostat=rc) ! time step
-                        read(fTemp, *, iostat=rc) ! day
-                        read(fTemp, *, iostat=rc) ! month
-                        read(fTemp, *, iostat=rc) ! year
-                        read(fTemp, *, iostat=rc)
-                        read(fTemp, *, iostat=rc)
-                        read(fTemp, *, iostat=rc)
-                        read(fTemp, '(a)', iostat=rc) StringREAD
-                        Tmin_temp = GetTmin()
-                        Tmax_temp = GetTmax()
-                        call SplitStringInTwoParams(StringREAD, Tmin_temp, &
-                                                                Tmax_temp)
-                        call SetTmin(Tmin_temp)
-                        call SetTmax(Tmax_temp)
-                    else
-                        read(fTemp, *, iostat=rc) Tmin_temp, Tmax_temp
-                        call SetTmin(Tmin_temp)
-                        call SetTmax(Tmax_temp)
-                    end if
+                    ! RPK fix 20
+!                   if (rc == iostat_end) then
+!                       rewind(fTemp)
+!                       read(fTemp, *, iostat=rc) ! description
+!                       read(fTemp, *, iostat=rc) ! time step
+!                       read(fTemp, *, iostat=rc) ! day
+!                       read(fTemp, *, iostat=rc) ! month
+!                       read(fTemp, *, iostat=rc) ! year
+!                       read(fTemp, *, iostat=rc)
+!                       read(fTemp, *, iostat=rc)
+!                       read(fTemp, *, iostat=rc)
+!                       read(fTemp, '(a)', iostat=rc) StringREAD
+!                       Tmin_temp = GetTmin()
+!                       Tmax_temp = GetTmax()
+!                       call SplitStringInTwoParams(StringREAD, Tmin_temp, &
+!                                                               Tmax_temp)
+!                       call SetTmin(Tmin_temp)
+!                       call SetTmax(Tmax_temp)
+!                   else
+!                       read(fTemp, *, iostat=rc) Tmin_temp, Tmax_temp
+!                       call SetTmin(Tmin_temp)
+!                       call SetTmax(Tmax_temp)
+!                   end if
+
+                    ! RPK fix 20
+                    i = RunningDay - TminFull(0)
+                    Tmin_temp = TminFull(i)
+                    i = RunningDay - TmaxFull(0)
+                    Tmax_temp = TmaxFull(i)
+                    call SetTmin(Tmin_temp)
+                    call SetTmax(Tmax_temp)
                 case(datatype_Decadely)
                     if (RunningDay > GetTminDataSet_DayNr(31)) then
                         TminDataSet_temp = GetTminDataSet()
@@ -5893,13 +5975,16 @@ subroutine CreateDailyClimFiles(FromSimDay, ToSimDay)
                     call SetTmin(GetTminDataSet_Param(i))
                     call SetTmax(GetTmaxDataSet_Param(i))
                 end select
-                write(fTempS, '(2f10.4)') GetTmin(), GetTmax()
+                ! RPK fix 21
+!               write(fTempS, '(2f10.4)') GetTmin(), GetTmax()
             end do
             ! Close files
-            if (GetTemperatureRecord_datatype() == datatype_Daily) then
-                close(fTemp)
-            end if
-            close(fTempS)
+            ! RPK fix 20
+!           if (GetTemperatureRecord_datatype() == datatype_Daily) then
+!               close(fTemp)
+!           end if
+            ! RPK fix 21
+!           close(fTempS)
         end if
     end if
 end subroutine CreateDailyClimFiles
@@ -5910,7 +5995,7 @@ subroutine OpenHarvestInfo()
     integer(int8) :: i
     character(len=:), allocatable :: TempString
 
-    if (GetManFile() /= '(None)') then
+    if (GetManFile() /= '(none)') then
         totalname = GetManFileFull()
     else
         totalname = trim(GetPathNameSimul())//'Cuttings.AqC'
@@ -5918,7 +6003,7 @@ subroutine OpenHarvestInfo()
     call fCuts_open(totalname, 'r')
     TempString = fCuts_read() ! description
     TempString = fCuts_read() ! AquaCrop version
-    if (GetManFile() /= '(None)') then
+    if (GetManFile() /= '(none)') then
         do i= 1, 10
             TempString = fCuts_read() ! management info
        end do
@@ -5935,70 +6020,95 @@ subroutine OpenClimFilesAndGetDataFirstDay(FirstDayNr)
 
     character(len=:), allocatable :: totalname
     integer(int32) :: i
-    real(dp) :: tmpRain, ETo_temp
+    integer(int32) :: j ! RPK fix 21
+    ! RPK fix 20
+    ! variable tmpRain renamed to Rain_temp to match ETo_temp, Tmin_temp, Tmax_temp
+    real(dp) :: Rain_temp, ETo_temp
     real(dp) :: Tmin_temp, Tmax_temp
+
     character(len=1025) :: TempString
 
     ! ETo file
-    if (GetEToFile() /= '(None)') then
-        totalname = trim(GetPathNameSimul())//'EToData.SIM'
-        call fEToSIM_open(totalname, 'r')
-        if (FirstDayNr == GetSimulation_FromDayNr()) then
-            TempString = fEToSIM_read()
-            read(TempString, *) ETo_temp
-            call SetETo(ETo_temp)
-        else
-            do i = GetSimulation_FromDayNr(), (FirstDayNr - 1)
-                TempString = fEToSIM_read()
-                read(TempString, *) ETo_temp
-                call SetETo(ETo_temp)
-            end do
-            TempString = fEToSIM_read()
-            read(TempString, *) ETo_temp
-            call SetETo(ETo_temp)
-        end if
+    if (GetEToFile() /= '(none)') then
+        ! RPK fix 21
+!       totalname = trim(GetPathNameSimul())//'EToData.SIM'
+!       call fEToSIM_open(totalname, 'r')
+!       if (FirstDayNr == GetSimulation_FromDayNr()) then
+!           TempString = fEToSIM_read()
+!           read(TempString, *) ETo_temp
+!           call SetETo(ETo_temp)
+!       else
+!           do i = GetSimulation_FromDayNr(), (FirstDayNr - 1)
+!               TempString = fEToSIM_read()
+!               read(TempString, *) ETo_temp
+!               call SetETo(ETo_temp)
+!           end do
+!           TempString = fEToSIM_read()
+!           read(TempString, *) ETo_temp
+!           call SetETo(ETo_temp)
+!       end if
+
+        ! RPK fix 21
+        j = FirstDayNr - EToFull(0)
+        ETo_Temp = EToFull(j)
+        call SetETo(ETo_temp)
     end if
     ! Rain file
-    if (GetRainFile() /= '(None)') then
-        totalname = trim(GetPathNameSimul())//'RainData.SIM'
-        call fRainSIM_open(totalname, 'r')
-        if (FirstDayNr == GetSimulation_FromDayNr()) then
-            TempString = fRainSIM_read()
-            read(TempString, *) tmpRain
-            call SetRain(tmpRain)
-        else
-            do i = GetSimulation_FromDayNr(), (FirstDayNr - 1)
-                TempString = fRainSIM_read()
-                read(TempString, *) tmpRain
-                call SetRain(tmpRain)
-            end do
-            TempString = fRainSIM_read()
-            read(TempString, *) tmpRain
-            call SetRain(tmpRain)
-        end if
+    if (GetRainFile() /= '(none)') then
+        ! RPK fix 21
+!       totalname = trim(GetPathNameSimul())//'RainData.SIM'
+!       call fRainSIM_open(totalname, 'r')
+!        if (FirstDayNr == GetSimulation_FromDayNr()) then
+!           TempString = fRainSIM_read()
+!           read(TempString, *) Rain_temp
+!           call SetRain(Rain_temp)
+!       else
+!           do i = GetSimulation_FromDayNr(), (FirstDayNr - 1)
+!               TempString = fRainSIM_read()
+!               read(TempString, *) Rain_temp
+!               call SetRain(Rain_temp)
+!           end do
+!           TempString = fRainSIM_read()
+!           read(TempString, *) Rain_temp
+!           call SetRain(Rain_temp)
+!       end if
+    
+        ! RPK fix 21
+        j = FirstDayNr - RainFull(0)
+        Rain_Temp = RainFull(j)
+        call SetRain(Rain_temp)
     end if
     ! Temperature file
-    if ((GetTemperatureFile() /= '(None)') .and.&
-        (GetTemperatureFile() /= '(External)')) then
-        totalname = trim(GetPathNameSimul())//'TempData.SIM'
-        call fTempSIM_open(totalname, 'r')
-        if (FirstDayNr == GetSimulation_FromDayNr()) then
-            TempString = fTempSIM_read()
-            read(TempString, *) Tmin_temp, Tmax_temp
-            call SetTmin(Tmin_temp)
-            call SetTmax(Tmax_temp)
-        else
-            do i = GetSimulation_FromDayNr(), (FirstDayNr - 1)
-                TempString = fTempSIM_read()
-                read(TempString, *) Tmin_temp, Tmax_temp
-                call SetTmin(Tmin_temp)
-                call SetTmax(Tmax_temp)
-            end do
-            TempString = fTempSIM_read()
-            read(TempString, *) Tmin_temp, Tmax_temp
-            call SetTmin(Tmin_temp)
-            call SetTmax(Tmax_temp)
-        end if
+    if ((GetTemperatureFile() /= '(none)') .and.&
+        (GetTemperatureFile() /= '(external)')) then
+        ! RPK fix 21
+!       totalname = trim(GetPathNameSimul())//'TempData.SIM'
+!       call fTempSIM_open(totalname, 'r')
+!       if (FirstDayNr == GetSimulation_FromDayNr()) then
+!           TempString = fTempSIM_read()
+!           read(TempString, *) Tmin_temp, Tmax_temp
+!           call SetTmin(Tmin_temp)
+!           call SetTmax(Tmax_temp)
+!       else
+!           do i = GetSimulation_FromDayNr(), (FirstDayNr - 1)
+!               TempString = fTempSIM_read()
+!               read(TempString, *) Tmin_temp, Tmax_temp
+!               call SetTmin(Tmin_temp)
+!               call SetTmax(Tmax_temp)
+!           end do
+!           TempString = fTempSIM_read()
+!           read(TempString, *) Tmin_temp, Tmax_temp
+!           call SetTmin(Tmin_temp)
+!           call SetTmax(Tmax_temp)
+!        end if
+
+        ! RPK fix 21
+        j = FirstDayNr - TminFull(0)
+        Tmin_Temp = TminFull(j)
+        call SetTmin(Tmin_temp)
+        j = FirstDayNr - TmaxFull(0)
+        Tmax_Temp = TmaxFull(j)
+        call SetTmax(Tmax_temp)
     else
         call SetTmin(GetSimulParam_Tmin())
         call SetTmax(GetSimulParam_Tmax())
@@ -6668,7 +6778,7 @@ subroutine InitializeRunPart2(NrRun, TheProjectType)
         call WriteTitlePart1MultResults(TheProjectType, NrRun)
     end if
 
-    if (GetPart2Eval() .and. (GetObservationsFile() /= '(None)')) then
+    if (GetPart2Eval() .and. (GetObservationsFile() /= '(none)')) then
         call CreateEvalData(NrRun)
     end if
 end subroutine InitializeRunPart2
@@ -6756,12 +6866,12 @@ subroutine AdvanceOneTimeStep(WPi, HarvestNow)
     logical :: WaterTableInProfile_temp, NoMoreCrop_temp
 
     ! 1. Get ETo
-    if (GetEToFile() == '(None)') then
+    if (GetEToFile() == '(none)') then
         call SetETo(5.0_dp)
     end if
 
     ! 2. Get Rain
-    if (GetRainFile() == '(None)') then
+    if (GetRainFile() == '(none)') then
         call SetRain(0._dp)
     end if
 
@@ -7302,7 +7412,7 @@ subroutine AdvanceOneTimeStep(WPi, HarvestNow)
     if (GetOut8Irri()) then
         call WriteIrrInfo()
     end if
-    if (GetPart2Eval() .and. (GetObservationsFile() /= '(None)')) then
+    if (GetPart2Eval() .and. (GetObservationsFile() /= '(none)')) then
         call WriteEvaluationData((GetDayNri()-GetSimulation_DelayedDays()-GetCrop_Day1()+1))
     end if
 
@@ -7328,31 +7438,57 @@ end subroutine AdvanceOneTimeStep
 
 
 subroutine ReadClimateNextDay()
-
-    real(dp) :: ETo_tmp
-    real(dp) :: tmpRain, Tmin_temp, Tmax_temp
+    ! RPK fix 21
+    integer :: j
+    ! RPK fix 21
+    ! variable ETotmp renamed to ETo_temp to match Tmin_temp, Tmax_temp
+    real(dp) :: ETo_temp
+    ! RPK fix 20
+    ! variable tmpRain renamed to Rain_temp to match Tmin_temp, Tmax_temp
+    real(dp) :: Rain_temp, Tmin_temp, Tmax_temp
     character(len=:), allocatable :: TempString
 
     ! Read Climate next day, Get GDDays and update SumGDDays
     if (GetDayNri() <= GetSimulation_ToDayNr()) then
-        if (GetEToFile() /= '(None)') then
-            TempString = fEToSIM_read()
-            read(TempString,*) ETo_tmp
-            call SetETo(ETo_tmp)
+        if (GetEToFile() /= '(none)') then
+            ! RPK fix 21
+!           TempString = fEToSIM_read()
+!           read(TempString,*) ETo_temp
+!           call SetETo(ETo_temp)
+
+            ! RPK fix 21
+            j = GetDayNri() - EToFull(0)
+            ETo_temp = EToFull(j)
+            call SetETo(ETo_temp)
         end if
-        if (GetRainFile() /= '(None)') then
-            TempString = fRainSIM_read()
-            read(TempString, *) tmpRain
-            call SetRain(tmpRain)
+        if (GetRainFile() /= '(none)') then
+            ! RPK fix 21
+!           TempString = fRainSIM_read()
+!           read(TempString, *) Rain_temp
+!           call SetRain(Rain_temp)
+
+            ! RPK fix 21
+            j = GetDayNri() - RainFull(0)
+            Rain_temp = RainFull(j)
+            call SetRain(Rain_temp)
         end if
-        if ((GetTemperatureFile() == '(None)') .or.&
-            (GetTemperatureFile() == '(External)')) then
+        if ((GetTemperatureFile() == '(none)') .or.&
+            (GetTemperatureFile() == '(external)')) then
             call SetTmin(GetSimulParam_Tmin())
             call SetTmax(GetSimulParam_Tmax())
         else
-            TempString = fTempSIM_read()
-            read(TempString, *) Tmin_temp, Tmax_temp
+            ! RPK fix 21
+!           TempString = fTempSIM_read()
+!           read(TempString, *) Tmin_temp, Tmax_temp
+!           call SetTmin(Tmin_temp)
+!           call SetTmax(Tmax_temp)
+
+            ! RPK fix 21
+            j = GetDayNri() - TminFull(0)
+            Tmin_temp = TminFull(j)
             call SetTmin(Tmin_temp)
+            j = GetDayNri() - TmaxFull(0)
+            Tmax_temp = TmaxFull(j)
             call SetTmax(Tmax_temp)
         end if
     end if
@@ -7847,6 +7983,14 @@ subroutine RunSimulation(TheProjectFile_, TheProjectType)
         call FinalizeRun1(NrRun, GetTheProjectFile(), TheProjectType)
         call FinalizeRun2(NrRun, TheProjectType)
     end do
+
+    ! RPK fix 25 - deallocate arrays
+    if (allocated(EToFull)) deallocate(EToFull)
+    if (allocated(RainFull)) deallocate(RainFull)
+    if (allocated(TminFull)) deallocate(TminFull)
+    if (allocated(TmaxFull)) deallocate(TmaxFull)
+    if (allocated(ProjectInput)) deallocate(ProjectInput)
+!   if (allocated(ProjectFileNames)) deallocate(ProjectFileNames)
 
     call FinalizeSimulation()
 end subroutine RunSimulation
