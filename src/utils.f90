@@ -64,7 +64,7 @@ function GetReleaseDate() result(str)
     !! Returns a string containing the month and year of the release.
     character(len=:), allocatable :: str
 
-    str = 'August 2024'
+    str = 'April 2025' ! RPK fix 25 - changed from August 2024 to April 2025
 end function GetReleaseDate
 
 
@@ -72,7 +72,7 @@ function GetVersionString() result(str)
     !! Returns a string containing the version number (major+minor).
     character(len=:), allocatable :: str
 
-    str = '7.2'
+    str = '7.3' ! RPK fix 25 - changed from 7.2 to 7.3
 end function GetVersionString
 
 
