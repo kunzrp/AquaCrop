@@ -1,6 +1,7 @@
 module ac_preparefertilitysalinity
 
-use ac_global, only: CO2ref,& 
+use ac_global, only: CO2ref, &  ! RPK fix 23
+                     CO2Full, & ! RPK fix 23
                      CropStressParametersSoilFertility, & 
                      datatype_daily, & 
                      datatype_decadely, & 
@@ -71,9 +72,9 @@ use ac_kinds, only: dp, &
                     sp
 use ac_tempprocessing, only: Bnormalized, &
                         CropStressParametersSoilSalinity, &
-                        fTnxReference_open, &
-                        fTnxReference_write, & 
-                        fTnxReference_close,&
+!                       fTnxReference_open, &  ! RPK fix 25 - *Reference.Tnx file no longer created
+!                       fTnxReference_write, & ! RPK fix 25 - *Reference.Tnx file no longer created
+!                       fTnxReference_close,&  ! RPK fix 25 - *Reference.Tnx file no longer created
                         GDDCDCToCDC, &
                         GrowingDegreeDays
 use ac_project_input, only: GetNumberSimulationRuns, &
@@ -101,6 +102,7 @@ integer(int32) function SumCalendarDaysReferenceTnx(ValGDDays, RefCropDay1,&
     real(dp), intent(in) :: TDayMax
 
     integer(int32) :: i
+    integer(int32) :: j ! RPK fix 24
     integer(int32) :: NrCDays
     real(dp) :: RemainingGDDays, DayGDD
     real(dp) :: TDayMin_loc, TDayMax_loc
@@ -110,7 +112,7 @@ integer(int32) function SumCalendarDaysReferenceTnx(ValGDDays, RefCropDay1,&
 
     NrCdays = 0
     if (ValGDDays > 0) then
-        if (GetTnxReferenceFile() == '(None)') then
+        if (GetTnxReferenceFile() == '(none)') then
             ! given average Tmin and Tmax
             DayGDD = DegreesDay(Tbase, Tupper, &
                        TDayMin_loc, TDayMax_loc, GetSimulParam_GDDMethod())
@@ -127,11 +129,23 @@ integer(int32) function SumCalendarDaysReferenceTnx(ValGDDays, RefCropDay1,&
             ! TminCropReference and TmaxCropReference arrays contain the TemperatureFilefull data
             i = StartDayNr - RefCropDay1
 
+            j = 0 ! RPK fix 24
             do while (RemainingGDDays > 0.1_dp)
                 i = i + 1
+                j = j + 1 ! RPK fix 24
+
                 if (i == size(GetTminCropReferenceRun())) then
                     i = 1
                 end if
+
+                if (i > 365) then
+                ! RPK fix 07 - if i > 365 an error occurs since arrays are dimensioned to 1:365
+                !              If AquaCrop is compiled in debug mode and run, it can hang (runs continually)
+                !              During testing, i > 365 when the season length is longer than a year when a crop
+                !              is grown in a very cold environment where GDDs take a long time to accumulate
+                    i = 1
+                end if
+
                 TDayMin_loc = GetTminCropReferenceRun_i(i)
                 TDayMax_loc = GetTmaxCropReferenceRun_i(i)
 
@@ -146,6 +160,13 @@ integer(int32) function SumCalendarDaysReferenceTnx(ValGDDays, RefCropDay1,&
                     NrCDays = NrCDays + 1
                 end if
                 RemainingGDDays = RemainingGDDays - DayGDD
+
+                ! RPK fix 24 - if there is a problem with the temperature data,
+                !              this will prevent a permanent loop that will hang the program
+                if (j > 1096) then
+                    write (*,*) 'ERROR: cannot determine crop maturity date'
+                    RemainingGDDays = 0.0_dp
+                end if
             end do
         end if
     end if
@@ -267,15 +288,17 @@ subroutine DailyTnxReferenceFileCoveringCropPeriod(CropFirstDay)
     real(sp) :: Tlow, Thigh
     character(len=1025) :: TempString
 
-    if (FileExists(GetTnxReferenceFileFull())) then
+    ! RPK fix 22 - *Reference.Tnx no longer created
+!   if (FileExists(GetTnxReferenceFileFull())) then
         ! CropFirstDay = DayNr1 in undefined year
         call DetermineDate(CropFirstDay, Dayi, Monthi, Yeari)
         call DetermineDayNr(Dayi, Monthi, (1901), DayNr1)
         
-        if (GetTnxReferenceFile() /= '(External)') then
-            ! create SIM file
-            call fTnxReference_open(trim(GetPathNameSimul()) // 'TCropReference.SIM','w')
-        end if
+        ! RPK fix 22 - TCropReference.SIM not need as values are stored in a global array
+!       if (GetTnxReferenceFile() /= '(external)') then
+!           ! create SIM file
+!           call fTnxReference_open(trim(GetPathNameSimul()) // 'TCropReference.SIM','w')
+!       end if
         
         i = 0
         do Dayi = DayNr1, 365
@@ -284,10 +307,11 @@ subroutine DailyTnxReferenceFileCoveringCropPeriod(CropFirstDay)
             Thigh = GetTmaxTnxReference365DaysRun_i(Dayi)
             call SetTminCropReferenceRun_i(i,Tlow)
             call SetTmaxCropReferenceRun_i(i,Thigh)
-            if (GetTnxReferenceFile() /= '(External)') then
-                write(TempString, '(f10.2, f10.2)') Tlow,Thigh
-                call fTnxReference_write(trim(TempString))
-            end if
+            ! RPK fix 22
+!           if (GetTnxReferenceFile() /= '(external)') then
+!               write(TempString, '(f10.2, f10.2)') Tlow,Thigh
+!               call fTnxReference_write(trim(TempString))
+!           end if
         end do
         do Dayi = 1, (DayNr1-1)
             i=i+1
@@ -295,60 +319,68 @@ subroutine DailyTnxReferenceFileCoveringCropPeriod(CropFirstDay)
             Thigh = GetTmaxTnxReference365DaysRun_i(Dayi)
             call SetTminCropReferenceRun_i(i,Tlow)
             call SetTmaxCropReferenceRun_i(i,Thigh)
-            if (GetTnxReferenceFile() /= '(External)') then
-                write(TempString, '(f10.2, f10.2)') Tlow,Thigh
-                call fTnxReference_write(trim(TempString))
-            end if
+            ! RPK fix 22
+!           if (GetTnxReferenceFile() /= '(external)') then
+!               write(TempString, '(f10.2, f10.2)') Tlow,Thigh
+!               call fTnxReference_write(trim(TempString))
+!           end if
         end do
-        
-        if (GetTnxReferenceFile() /= '(External)') then
-            ! Close files
-            call fTnxReference_close()
-        end if
-    end if
+
+        ! RPK fix 22    
+!       if (GetTnxReferenceFile() /= '(external)') then
+!           ! Close files
+!           call fTnxReference_close()
+!       end if
+    ! RPK fix 22
+!   end if
 end subroutine DailyTnxReferenceFileCoveringCropPeriod
 
 
 real(dp) function CO2ForTnxReferenceYear(TnxReferenceYear)
     integer(int32), intent(in) :: TnxReferenceYear
 
-    integer(int32) :: i
-    integer(int32) :: fhandle, rc
-    character(len=1025) :: TempString
-    real(dp) :: TheCO2, CO2a, CO2b, YearA, YearB
+!   integer(int32) :: i                          ! RPK fix 23 - variable  no longer needed
+!   integer(int32) :: fhandle, rc                ! RPK fix 23 - variable  no longer needed
+!   character(len=1025) :: TempString            ! RPK fix 23 - variable  no longer needed
+    real(dp) :: TheCO2
+!   real(dp) :: CO2a, CO2b, YearA, YearB         ! RPK fix 23 - variable  no longer needed
 
     if (TnxReferenceYear == 2000) then
         TheCO2 = CO2Ref
     else
-        open(newunit=fhandle, file=trim(GetCO2FileFull()), status='old', &
-                                                    action='read',iostat=rc)
-        do i= 1, 3
-            read(fhandle, *, iostat=rc) ! Description and Title
-        end do
-        ! from year
-        read(fhandle, '(a)', iostat=rc) TempString
-        call SplitStringInTwoParams(trim(TempString), YearB, CO2b)
-        if (roundc(YearB, mold=1) >= TnxReferenceYear) then
-            TheCO2 = CO2b
-        else
-            loop: do
-                YearA = YearB
-                CO2a = CO2b
-                read(fhandle, '(a)', iostat=rc) TempString
-                call SplitStringInTwoParams(trim(TempString), YearB, CO2b)
-                if ((roundc(YearB, mold=1) >= TnxReferenceYear) .or. (rc == iostat_end)) exit loop
-            end do loop
-            if (TnxReferenceYear > roundc(YearB, mold=1)) then
-                TheCO2 = CO2b
-            else
-                TheCO2 = CO2a + (CO2b-CO2a)*(TnxReferenceYear - &
-                    roundc(YearA, mold=1))/(roundc(YearB, mold=1) - &
-                    roundc(YearA, mold=1))
-            end if
-        end if
-        Close(fhandle)
+        ! RPK fix 23 - use CO2 values stored in global array CO2Full
+!       open(newunit=fhandle, file=trim(GetCO2FileFull()), status='old', &
+!                                                   action='read',iostat=rc)
+!       do i= 1, 3
+!           read(fhandle, *, iostat=rc) ! Description and Title
+!       end do
+!       ! from year
+!       read(fhandle, '(a)', iostat=rc) TempString
+!       call SplitStringInTwoParams(trim(TempString), YearB, CO2b)
+!       if (roundc(YearB, mold=1) >= TnxReferenceYear) then
+!           TheCO2 = CO2b
+!       else
+!           loop: do
+!               YearA = YearB
+!               CO2a = CO2b
+!               read(fhandle, '(a)', iostat=rc) TempString
+!               call SplitStringInTwoParams(trim(TempString), YearB, CO2b)
+!               if ((roundc(YearB, mold=1) >= TnxReferenceYear) .or. (rc == iostat_end)) exit loop
+!           end do loop
+!           if (TnxReferenceYear > roundc(YearB, mold=1)) then
+!               TheCO2 = CO2b
+!           else
+!               TheCO2 = CO2a + (CO2b-CO2a)*(TnxReferenceYear - &
+!                   roundc(YearA, mold=1))/(roundc(YearB, mold=1) - &
+!                   roundc(YearA, mold=1))
+!           end if
+!       end if
+!       Close(fhandle)
+!       CO2ForTnxReferenceYear = TheCO2 ! RPK fix 23 - this line should be inside the end if
+
+        ! RPK fix 23
+        CO2ForTnxReferenceYear = CO2Full(TnxReferenceYear)
     end if
-    CO2ForTnxReferenceYear = TheCO2
 end function CO2ForTnxReferenceYear
 
 
@@ -876,7 +908,7 @@ subroutine ReferenceStressBiomassRelationship(TheDaysToCCini, &
     call DetermineDayNr(Dayi, Monthi, (1901), RefCropDay1)  ! not linked to a specific year
 
     ! 2. Create TCropReference.SIM (i.e. daily mean Tnx for 365 days from Onset onwards)
-    if (GetTnxReferenceFile() /= '(None)') then
+    if (GetTnxReferenceFile() /= '(none)') then
         call DailyTnxReferenceFileCoveringCropPeriod(RefCropDay1)
     end if
 
@@ -1015,7 +1047,7 @@ subroutine ReferenceCCxSaltStressRelationship(TheDaysToCCini, &
     call DetermineDayNr(Dayi, Monthi, (1901), RefCropDay1)  ! not linked to a specific year
 
     ! 2. Create TCropReference.SIM (i.e. daily mean Tnx for 365 days from Onset onwards)
-    if (GetTnxReferenceFile() /= '(None)') then
+    if (GetTnxReferenceFile() /= '(none)') then
         call DailyTnxReferenceFileCoveringCropPeriod(RefCropDay1)
     end if
 
