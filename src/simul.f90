@@ -668,17 +668,22 @@ subroutine DetermineBiomassAndYield(dayi, ETo, TminOnDay, TmaxOnDay, CO2i, &
         WPunlim = WPi       ! no water stress, no fertiltiy stress
         if (GetSimulation_EffectStress_RedWP() > 0._dp) then ! Reductions are zero if no fertility stress
             ! water stress and fertility stress
-            if ((SumKci/real(SumKcTopStress, dp)) < 1._dp) then
-                if (ETo > 0._dp) then
-                    SumKci = SumKci + Tact/ETo
+            ! RPK fix 24 - prevent division by zero error
+            if (SumKcTopStress > 0._dp) then
+!               if ((SumKci/real(SumKcTopStress, dp)) < 1._dp) then ! RPK fix 24 - SumKcTopStress is real(dp)
+                if (SumKci/SumKcTopStress < 1._dp) then
+                    if (ETo > 0._dp) then
+                        SumKci = SumKci + Tact/ETo
+                    end if
+                    ! RPK 24 - prevent division by zero error    
+                    if (SumKci > 0._dp) then
+                        WPi = WPi * (1._dp - (GetSimulation_EffectStress_RedWP()/100._dp) &
+                                                * exp(k*log(SumKci/SumKcTopStress)) )
+                    end if
+                else
+                    WPi = WPi * (1._dp - GetSimulation_EffectStress_RedWP()/100._dp)
                 end if
-                if (SumKci > 0._dp) then
-                    WPi = WPi * (1._dp - (GetSimulation_EffectStress_RedWP()/100._dp) &
-                                            * exp(k*log(SumKci/SumKcTopStress)) )
-                end if
-            else
-                WPi = WPi * (1._dp - GetSimulation_EffectStress_RedWP()/100._dp)
-            end if
+            endif
         elseif (ETo > 0._dp) then
             SumKci = SumKci + Tact/ETo
         end if
@@ -3802,17 +3807,23 @@ subroutine DetermineCCiGDD(CCxTotal, CCoTotal, &
         if (GetSimulation_SWCtopSoilConsidered()) then
             ! top soil is relative wetter than total root zone
             SWCeffectiveRootZone = GetRootZoneWC_ZtopAct()
-            Wrelative = (GetRootZoneWC_ZtopFC() &
-                            - GetRootZoneWC_ZtopAct()) &
+            Wrelative = (GetRootZoneWC_ZtopFC() - GetRootZoneWC_ZtopAct()) &
                         /(GetRootZoneWC_ZtopFC() - GetRootZoneWC_ZtopWP())
                                                                 ! top soil
             FCeffectiveRootZone = GetRootZoneWC_ZtopFC()
             WPeffectiveRootZone = GetRootZoneWC_ZtopWP()
         else
             SWCeffectiveRootZone = GetRootZoneWC_Actual()
-            Wrelative = (GetRootZoneWC_FC() - GetRootZoneWC_Actual()) &
+            ! RPK fix 24 - prevent division by zero error
+            if (GetRootZoneWC_FC() /= GetRootZoneWC_WP()) then
+                Wrelative = (GetRootZoneWC_FC() - GetRootZoneWC_Actual()) &
                             /(GetRootZoneWC_FC() - GetRootZoneWC_WP())
                                                         ! total root zone
+            else
+                !  RPK fix 24 - prevents Wrelative from being undefined,
+                !               but value is zero, which is a problem
+                Wrelative = (GetRootZoneWC_FC() - GetRootZoneWC_Actual())
+            end if
             FCeffectiveRootZone = GetRootZoneWC_FC()
             WPeffectiveRootZone = GetRootZoneWC_WP()
         end if
